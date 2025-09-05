@@ -130,8 +130,12 @@ export default function MealForm({
               placeholder="e.g., Homemade Spaghetti Carbonara"
               value={formData.title}
               onChange={handleInputChange}
+              className={formErrors.title ? 'border-destructive' : ''}
               required
             />
+            {formErrors.title && (
+              <p className="text-sm text-destructive">{formErrors.title}</p>
+            )}
           </div>
 
           <div className="space-y-2">
