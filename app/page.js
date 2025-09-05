@@ -29,6 +29,7 @@ import { toast } from 'sonner';
 import AuthForm from '@/components/AuthForm';
 import MealCard from '@/components/MealCard';
 import MealForm from '@/components/MealForm';
+import MealSuggestions from '@/components/MealSuggestions';
 
 export default function App() {
   const [user, setUser] = useState(null);
