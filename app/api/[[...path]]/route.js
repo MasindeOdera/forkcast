@@ -211,27 +211,57 @@ export async function POST(request, { params }) {
         return withCors(NextResponse.json({ error: 'Unauthorized' }, { status: 401 }));
       }
 
-      const { title, ingredients, instructions, imageUrl } = await request.json();
+      let requestData;
+      try {
+        requestData = await request.json();
+      } catch (error) {
+        return withCors(NextResponse.json({ 
+          error: 'Invalid JSON data. Please check your input and try again.' 
+        }, { status: 400 }));
+      }
+
+      const { title, ingredients, instructions, imageUrl } = requestData;
       
-      if (!title || !ingredients || !instructions) {
-        return withCors(NextResponse.json({ error: 'Title, ingredients, and instructions are required' }, { status: 400 }));
+      // More detailed validation with specific error messages
+      const errors = [];
+      if (!title || title.trim().length === 0) {
+        errors.push('Meal title is required');
+      }
+      if (!ingredients || ingredients.trim().length === 0) {
+        errors.push('Ingredients list is required');
+      }
+      if (!instructions || instructions.trim().length === 0) {
+        errors.push('Cooking instructions are required');
+      }
+      
+      if (errors.length > 0) {
+        return withCors(NextResponse.json({ 
+          error: 'Please fill in all required fields:', 
+          details: errors 
+        }, { status: 400 }));
       }
 
       const mealId = uuidv4();
       const meal = {
         id: mealId,
         userId: user.userId,
-        title,
-        ingredients,
-        instructions,
+        title: title.trim(),
+        ingredients: ingredients.trim(),
+        instructions: instructions.trim(),
         imageUrl: imageUrl || null,
         createdAt: new Date(),
         updatedAt: new Date(),
       };
 
-      await db.collection('meals').insertOne(meal);
-
-      return withCors(NextResponse.json(meal));
+      try {
+        await db.collection('meals').insertOne(meal);
+        return withCors(NextResponse.json(meal));
+      } catch (dbError) {
+        console.error('Database error:', dbError);
+        return withCors(NextResponse.json({ 
+          error: 'Failed to save meal. Please try again.' 
+        }, { status: 500 }));
+      }
     }
 
     if (path === 'upload') {
