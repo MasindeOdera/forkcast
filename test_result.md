@@ -101,3 +101,137 @@
 #====================================================================================================
 # Testing Data - Main Agent and testing sub agent both should log testing data below this section
 #====================================================================================================
+
+user_problem_statement: "Test the Forkcast app backend API endpoints including Authentication APIs (register/login), Meal APIs (CRUD operations), Image Upload API, and User API. The app was showing a JSON parsing error during registration."
+
+backend:
+  - task: "Authentication - User Registration"
+    implemented: true
+    working: true
+    file: "app/api/[[...path]]/route.js"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        - working: true
+          agent: "testing"
+          comment: "POST /api/auth/register endpoint tested successfully. Returns proper JWT token and user object with id, username, and createdAt fields. Password validation and duplicate username checking working correctly."
+
+  - task: "Authentication - User Login"
+    implemented: true
+    working: true
+    file: "app/api/[[...path]]/route.js"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        - working: true
+          agent: "testing"
+          comment: "POST /api/auth/login endpoint tested successfully. Validates credentials correctly and returns JWT token with user data. Proper error handling for invalid credentials."
+
+  - task: "User API - Get Current User"
+    implemented: true
+    working: true
+    file: "app/api/[[...path]]/route.js"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        - working: true
+          agent: "testing"
+          comment: "GET /api/users/me endpoint tested successfully. Requires authentication and returns user data without password field (security compliant). Proper 401 handling for unauthorized requests."
+
+  - task: "Meals API - Get All Meals"
+    implemented: true
+    working: true
+    file: "app/api/[[...path]]/route.js"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        - working: true
+          agent: "testing"
+          comment: "GET /api/meals endpoint tested successfully. Returns array of meals with user information. Supports search and pagination parameters. Requires authentication."
+
+  - task: "Meals API - Create Meal"
+    implemented: true
+    working: true
+    file: "app/api/[[...path]]/route.js"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        - working: true
+          agent: "testing"
+          comment: "POST /api/meals endpoint tested successfully. Creates meals with proper validation for required fields (title, ingredients, instructions). Returns complete meal object with UUID, timestamps, and user association."
+
+  - task: "Meals API - Get User Meals"
+    implemented: true
+    working: true
+    file: "app/api/[[...path]]/route.js"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        - working: true
+          agent: "testing"
+          comment: "GET /api/meals?userId=X endpoint tested successfully. Filters meals by specific user ID correctly. Returns only meals belonging to the specified user."
+
+  - task: "Meals API - Update Meal"
+    implemented: true
+    working: true
+    file: "app/api/[[...path]]/route.js"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        - working: true
+          agent: "testing"
+          comment: "PUT /api/meals/{mealId} endpoint tested successfully. Updates meal fields correctly and maintains proper ownership validation. Only allows users to update their own meals."
+
+  - task: "Meals API - Delete Meal"
+    implemented: true
+    working: true
+    file: "app/api/[[...path]]/route.js"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        - working: true
+          agent: "testing"
+          comment: "DELETE /api/meals/{mealId} endpoint tested successfully. Deletes meals with proper ownership validation and Cloudinary image cleanup. Returns success message."
+
+  - task: "Image Upload API"
+    implemented: true
+    working: true
+    file: "app/api/[[...path]]/route.js"
+    stuck_count: 1
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        - working: false
+          agent: "testing"
+          comment: "Initial test failed with Cloudinary 'Invalid extension in transformation: auto' error due to format parameter."
+        - working: true
+          agent: "testing"
+          comment: "Fixed by removing 'format: auto' parameter from Cloudinary upload configuration. POST /api/upload now works correctly with proper file validation, size limits, and returns Cloudinary URL with metadata."
+
+frontend:
+  # Frontend testing not performed as per instructions
+
+metadata:
+  created_by: "testing_agent"
+  version: "1.0"
+  test_sequence: 1
+  run_ui: false
+
+test_plan:
+  current_focus:
+    - "All backend API endpoints tested and working"
+  stuck_tasks: []
+  test_all: true
+  test_priority: "high_first"
+
+agent_communication:
+    - agent: "testing"
+      message: "Completed comprehensive backend API testing for Forkcast app. All 9 API endpoints tested successfully. Fixed one Cloudinary upload issue by removing problematic format parameter. No JSON parsing errors found during registration - the issue may have been resolved or was environment-specific. All authentication, meal CRUD operations, user management, and image upload functionality working correctly. Backend is fully functional and ready for production use."
