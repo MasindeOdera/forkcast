@@ -65,10 +65,35 @@ export default function MealForm({
     });
   };
 
+  const [formErrors, setFormErrors] = useState({});
+
+  const validateForm = () => {
+    const errors = {};
+    
+    if (!formData.title.trim()) {
+      errors.title = 'Meal title is required';
+    }
+    
+    if (!formData.ingredients.trim()) {
+      errors.ingredients = 'Ingredients list is required';
+    } else if (formData.ingredients.trim().length < 10) {
+      errors.ingredients = 'Please provide more detailed ingredients (at least 10 characters)';
+    }
+    
+    if (!formData.instructions.trim()) {
+      errors.instructions = 'Cooking instructions are required';
+    } else if (formData.instructions.trim().length < 20) {
+      errors.instructions = 'Please provide more detailed instructions (at least 20 characters)';
+    }
+    
+    setFormErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+
   const handleSubmit = (e) => {
     e.preventDefault();
     
-    if (!formData.title.trim() || !formData.ingredients.trim() || !formData.instructions.trim()) {
+    if (!validateForm()) {
       return;
     }
 
