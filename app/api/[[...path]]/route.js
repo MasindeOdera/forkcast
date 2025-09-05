@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { connectToDatabase } from '@/lib/mongodb';
 import { hashPassword, verifyPassword, generateToken, getUserFromToken } from '@/lib/auth';
+import { MealSuggestionService } from '@/lib/llm-service';
 import cloudinary from '@/lib/cloudinary';
 import { v4 as uuidv4 } from 'uuid';
 
