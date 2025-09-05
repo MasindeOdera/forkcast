@@ -273,7 +273,6 @@ export async function POST(request, { params }) {
             folder: 'forkcast/meals',
             resource_type: 'image',
             quality: 'auto:eco',
-            format: 'auto',
             public_id: `meal-${user.userId}-${Date.now()}`,
           },
           (error, result) => {
