@@ -321,6 +321,45 @@ export async function POST(request, { params }) {
       }));
     }
 
+    if (path === 'meal-suggestions') {
+      const user = getUserFromToken(request);
+      if (!user) {
+        return withCors(NextResponse.json({ error: 'Unauthorized' }, { status: 401 }));
+      }
+
+      try {
+        const { prompt, ingredients, dietary, cuisine, mealType } = await request.json();
+        
+        if (!prompt || prompt.trim().length === 0) {
+          return withCors(NextResponse.json({ 
+            error: 'Please describe what kind of meal you\'re looking for' 
+          }, { status: 400 }));
+        }
+
+        const apiKey = process.env.EMERGENT_LLM_KEY;
+        if (!apiKey) {
+          return withCors(NextResponse.json({ 
+            error: 'AI service is not configured' 
+          }, { status: 500 }));
+        }
+
+        const mealService = new MealSuggestionService(apiKey);
+        const suggestions = await mealService.getMealSuggestions(prompt, {
+          ingredients,
+          dietary,
+          cuisine,
+          mealType
+        });
+
+        return withCors(NextResponse.json({ suggestions }));
+      } catch (error) {
+        console.error('Meal suggestion error:', error);
+        return withCors(NextResponse.json({ 
+          error: 'Failed to generate meal suggestions. Please try again.' 
+        }, { status: 500 }));
+      }
+    }
+
     return withCors(NextResponse.json({ error: 'Not found' }, { status: 404 }));
     
   } catch (error) {
