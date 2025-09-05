@@ -483,14 +483,17 @@ class ForkcastAPITester:
                 self.test_meals_update()
                 # Test upload before delete
                 self.test_upload_image()
+                # Test AI suggestions
+                self.test_ai_suggestions()
                 self.test_meals_delete()
             else:
                 # Skip dependent tests if meal creation fails
                 self.log_result('meals_get_user', 'skip', 'Meal creation failed')
                 self.log_result('meals_update', 'skip', 'Meal creation failed')
                 self.log_result('meals_delete', 'skip', 'Meal creation failed')
-                # Still test upload independently
+                # Still test upload and AI suggestions independently
                 self.test_upload_image()
+                self.test_ai_suggestions()
         else:
             # Skip all tests if registration fails
             for test_name in ['auth_login', 'users_me', 'meals_get_all', 'meals_create', 
