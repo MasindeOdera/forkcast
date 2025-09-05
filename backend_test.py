@@ -32,7 +32,8 @@ class ForkcastAPITester:
             'meals_update': {'status': 'pending', 'details': ''},
             'meals_delete': {'status': 'pending', 'details': ''},
             'upload_image': {'status': 'pending', 'details': ''},
-            'users_me': {'status': 'pending', 'details': ''}
+            'users_me': {'status': 'pending', 'details': ''},
+            'ai_suggestions': {'status': 'pending', 'details': ''}
         }
 
     def log_result(self, test_name, status, details):
