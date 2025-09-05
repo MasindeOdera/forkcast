@@ -1,0 +1,165 @@
+'use client';
+
+import { useState } from 'react';
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { User, Clock, ChefHat, Eye, Edit, Trash2 } from 'lucide-react';
+import { formatDistanceToNow } from 'date-fns';
+
+export default function MealCard({ meal, currentUserId, onEdit, onDelete }) {
+  const [showDetails, setShowDetails] = useState(false);
+  const isOwner = meal.userId === currentUserId;
+
+  const formatIngredients = (ingredients) => {
+    if (typeof ingredients === 'string') {
+      return ingredients.split('\n').filter(ingredient => ingredient.trim());
+    }
+    return Array.isArray(ingredients) ? ingredients : [];
+  };
+
+  const formatInstructions = (instructions) => {
+    if (typeof instructions === 'string') {
+      return instructions.split('\n').filter(instruction => instruction.trim());
+    }
+    return Array.isArray(instructions) ? instructions : [];
+  };
+
+  return (
+    <Card className="overflow-hidden hover:shadow-lg transition-shadow">
+      {meal.imageUrl && (
+        <div className="aspect-video relative overflow-hidden">
+          <img
+            src={meal.imageUrl}
+            alt={meal.title}
+            className="w-full h-full object-cover"
+          />
+        </div>
+      )}
+      
+      <CardHeader className="pb-3">
+        <div className="flex items-start justify-between">
+          <CardTitle className="text-lg line-clamp-2">{meal.title}</CardTitle>
+          {isOwner && (
+            <div className="flex gap-1 ml-2">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => onEdit?.(meal)}
+                className="h-8 w-8 p-0"
+              >
+                <Edit className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => onDelete?.(meal)}
+                className="h-8 w-8 p-0 text-destructive hover:text-destructive"
+              >
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            </div>
+          )}
+        </div>
+        
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <Avatar className="h-6 w-6">
+            <AvatarFallback className="text-xs">
+              {meal.user?.username?.[0]?.toUpperCase() || 'U'}
+            </AvatarFallback>
+          </Avatar>
+          <span>{meal.user?.username || 'Unknown'}</span>
+          <span>•</span>
+          <Clock className="h-3 w-3" />
+          <span>{formatDistanceToNow(new Date(meal.createdAt), { addSuffix: true })}</span>
+        </div>
+      </CardHeader>
+      
+      <CardContent className="pb-3">
+        <div className="space-y-2">
+          <div className="flex items-center gap-2">
+            <ChefHat className="h-4 w-4 text-muted-foreground" />
+            <span className="text-sm font-medium">
+              {formatIngredients(meal.ingredients).length} ingredients
+            </span>
+          </div>
+          
+          <p className="text-sm text-muted-foreground line-clamp-2">
+            {formatInstructions(meal.instructions)[0] || 'No instructions available'}
+          </p>
+        </div>
+      </CardContent>
+      
+      <CardFooter>
+        <Dialog open={showDetails} onOpenChange={setShowDetails}>
+          <DialogTrigger asChild>
+            <Button variant="outline" className="w-full">
+              <Eye className="mr-2 h-4 w-4" />
+              View Recipe
+            </Button>
+          </DialogTrigger>
+          
+          <DialogContent className="max-w-2xl max-h-[80vh]">
+            <DialogHeader>
+              <DialogTitle className="text-xl">{meal.title}</DialogTitle>
+              <div className="flex items-center gap-2 text-muted-foreground">
+                <User className="h-4 w-4" />
+                <span>by {meal.user?.username}</span>
+                <span>•</span>
+                <Clock className="h-4 w-4" />
+                <span>{formatDistanceToNow(new Date(meal.createdAt), { addSuffix: true })}</span>
+              </div>
+            </DialogHeader>
+            
+            <ScrollArea className="max-h-[60vh]">
+              <div className="space-y-6">
+                {meal.imageUrl && (
+                  <img
+                    src={meal.imageUrl}
+                    alt={meal.title}
+                    className="w-full h-64 object-cover rounded-lg"
+                  />
+                )}
+                
+                <div>
+                  <h3 className="font-semibold mb-3 flex items-center gap-2">
+                    <ChefHat className="h-5 w-5" />
+                    Ingredients
+                  </h3>
+                  <ul className="space-y-1">
+                    {formatIngredients(meal.ingredients).map((ingredient, index) => (
+                      <li key={index} className="flex items-start gap-2">
+                        <span className="text-primary">•</span>
+                        <span className="text-sm">{ingredient}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+                
+                <div>
+                  <h3 className="font-semibold mb-3 flex items-center gap-2">
+                    <Clock className="h-5 w-5" />
+                    Instructions
+                  </h3>
+                  <ol className="space-y-2">
+                    {formatInstructions(meal.instructions).map((instruction, index) => (
+                      <li key={index} className="flex gap-3">
+                        <Badge variant="outline" className="min-w-[1.5rem] h-6 text-xs">
+                          {index + 1}
+                        </Badge>
+                        <span className="text-sm flex-1">{instruction}</span>
+                      </li>
+                    ))}
+                  </ol>
+                </div>
+              </div>
+            </ScrollArea>
+          </DialogContent>
+        </Dialog>
+      </CardFooter>
+    </Card>
+  );
+}
