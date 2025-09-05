@@ -417,6 +417,53 @@ class ForkcastAPITester:
         
         return False
 
+    def test_ai_suggestions(self):
+        """Test AI meal suggestions"""
+        print("\n=== Testing AI - Meal Suggestions ===")
+        
+        if not self.auth_token:
+            self.log_result('ai_suggestions', 'skip', 'No auth token available')
+            return False
+            
+        try:
+            url = f"{self.base_url}/meal-suggestions"
+            payload = {
+                "prompt": "I want something healthy and quick to make for dinner",
+                "ingredients": ["chicken", "vegetables", "rice"],
+                "dietary": "low-carb",
+                "cuisine": "Asian",
+                "mealType": "dinner"
+            }
+            
+            response = self.session.post(url, json=payload)
+            
+            if response.status_code == 200:
+                data = response.json()
+                
+                # Validate response structure
+                if 'suggestions' in data:
+                    suggestions = data['suggestions']
+                    if isinstance(suggestions, str) and len(suggestions) > 0:
+                        self.log_result('ai_suggestions', 'pass', f'AI suggestions generated successfully (length: {len(suggestions)} chars)')
+                        return True
+                    else:
+                        self.log_result('ai_suggestions', 'fail', f'Invalid suggestions format: {type(suggestions)}')
+                else:
+                    self.log_result('ai_suggestions', 'fail', f'Missing suggestions in response: {data}')
+            else:
+                error_msg = response.text
+                try:
+                    error_data = response.json()
+                    error_msg = error_data.get('error', error_msg)
+                except:
+                    pass
+                self.log_result('ai_suggestions', 'fail', f'HTTP {response.status_code}: {error_msg}')
+                
+        except Exception as e:
+            self.log_result('ai_suggestions', 'fail', f'Exception: {str(e)}')
+        
+        return False
+
     def run_all_tests(self):
         """Run all API tests in sequence"""
         print(f"Starting Forkcast Backend API Tests")
