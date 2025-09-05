@@ -130,14 +130,29 @@ export default function App() {
         body: JSON.stringify(formData)
       });
 
+      // Check if response is JSON
+      const contentType = response.headers.get('content-type');
+      let errorData;
+      
+      if (contentType && contentType.includes('application/json')) {
+        errorData = await response.json();
+      } else {
+        // If it's not JSON, it might be an HTML error page
+        const textResponse = await response.text();
+        console.error('Non-JSON response:', textResponse);
+        throw new Error('Server returned an unexpected response. Please try again.');
+      }
+
       if (!response.ok) {
-        const errorData = await response.json();
+        if (errorData.details && Array.isArray(errorData.details)) {
+          throw new Error(`${errorData.error}\n• ${errorData.details.join('\n• ')}`);
+        }
         throw new Error(errorData.error || 'Failed to save meal');
       }
 
-      const savedMeal = await response.json();
+      const savedMeal = errorData; // It's actually the saved meal data
       
-      toast.success(editingMeal ? 'Meal updated successfully!' : 'Meal created successfully!');
+      toast.success(editingMeal ? 'Meal updated successfully! 🎉' : 'Meal created successfully! 🎉');
       
       // Refresh meals
       await loadMeals();
