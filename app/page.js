@@ -409,6 +409,12 @@ export default function App() {
                 </div>
               )}
             </TabsContent>
+
+            <TabsContent value="ai-suggestions" className="space-y-6">
+              <div className="flex items-center justify-center">
+                <MealSuggestions />
+              </div>
+            </TabsContent>
           </Tabs>
         </div>
       </main>
