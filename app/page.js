@@ -321,6 +321,13 @@ export default function App() {
                     {myMeals.length}
                   </Badge>
                 </TabsTrigger>
+                <TabsTrigger value="ai-suggestions" className="flex items-center gap-2">
+                  <Sparkles className="h-4 w-4" />
+                  <span className="hidden sm:inline">AI Ideas</span>
+                  <Badge variant="secondary" className="ml-1 bg-primary/10 text-primary">
+                    AI
+                  </Badge>
+                </TabsTrigger>
               </TabsList>
 
               <Button
