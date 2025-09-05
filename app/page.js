@@ -22,7 +22,8 @@ import {
   Users, 
   Loader2,
   UtensilsCrossed,
-  RefreshCw
+  RefreshCw,
+  Sparkles
 } from 'lucide-react';
 import { toast } from 'sonner';
 
