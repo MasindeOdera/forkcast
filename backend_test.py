@@ -497,7 +497,7 @@ class ForkcastAPITester:
         else:
             # Skip all tests if registration fails
             for test_name in ['auth_login', 'users_me', 'meals_get_all', 'meals_create', 
-                             'meals_get_user', 'meals_update', 'meals_delete', 'upload_image']:
+                             'meals_get_user', 'meals_update', 'meals_delete', 'upload_image', 'ai_suggestions']:
                 self.log_result(test_name, 'skip', 'User registration failed')
 
     def print_summary(self):
