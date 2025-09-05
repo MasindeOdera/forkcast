@@ -12,7 +12,7 @@ import uuid
 from datetime import datetime
 
 # Configuration
-BASE_URL = "https://forkcast-app.preview.emergentagent.com/api"
+BASE_URL = "http://localhost:3000/api"
 TEST_USERNAME = f"testuser_{int(time.time())}"
 TEST_PASSWORD = "testpass123"
 
