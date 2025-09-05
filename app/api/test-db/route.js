@@ -1,23 +1,31 @@
 import { NextResponse } from 'next/server';
-import { connectToDatabase } from '@/lib/mongodb';
+import { connectToDatabase } from '@/lib/jsondb';
 
 export async function GET() {
   try {
-    console.log('Testing MongoDB connection...');
-    console.log('MONGO_URL:', process.env.MONGO_URL ? 'Present' : 'Missing');
-    console.log('DB_NAME:', process.env.DB_NAME);
+    console.log('Testing JSON Database connection...');
     
     const { db } = await connectToDatabase();
     
     // Test basic database operation
-    const collections = await db.listCollections().toArray();
-    console.log('Connected successfully! Collections:', collections.map(c => c.name));
+    const users = await db.collection('users').find().then(results => 
+      Array.isArray(results) ? results : []
+    );
+    const meals = await db.collection('meals').find().then(results => 
+      Array.isArray(results) ? results : []
+    );
+    
+    console.log('Connected successfully!');
+    console.log('Users:', users.length);
+    console.log('Meals:', meals.length);
     
     return NextResponse.json({
       success: true,
-      message: 'Database connection successful',
-      database: process.env.DB_NAME,
-      collections: collections.map(c => c.name),
+      message: 'JSON Database connection successful',
+      database: 'JSON Database',
+      users: users.length,
+      meals: meals.length,
+      sampleUser: users[0] ? { username: users[0].username, id: users[0].id } : null,
       timestamp: new Date().toISOString()
     });
   } catch (error) {
@@ -27,8 +35,7 @@ export async function GET() {
       success: false,
       error: error.message,
       stack: error.stack,
-      mongoUrl: process.env.MONGO_URL ? 'Present (hidden)' : 'Missing',
-      dbName: process.env.DB_NAME
+      database: 'JSON Database'
     }, { status: 500 });
   }
 }
