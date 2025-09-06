@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { connectToDatabase } from '@/lib/jsondb';
+import { connectToDatabase } from '@/lib/supabase-db';
 import { hashPassword, verifyPassword, generateToken, getUserFromToken } from '@/lib/auth';
 import { MealSuggestionService } from '@/lib/llm-service';
 import cloudinary from '@/lib/cloudinary';
