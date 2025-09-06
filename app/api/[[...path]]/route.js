@@ -152,7 +152,7 @@ export async function POST(request, { params }) {
         return withCors(NextResponse.json({ error: 'Username already exists' }, { status: 400 }));
       }
 
-      // Create user
+      // Create user - fix the date field name to match Supabase schema
       const hashedPassword = await hashPassword(password);
       const userId = uuidv4();
       
@@ -160,7 +160,7 @@ export async function POST(request, { params }) {
         id: userId,
         username,
         password: hashedPassword,
-        createdAt: new Date(),
+        created_at: new Date(), // Changed from createdAt to created_at
       };
 
       await db.collection('users').insertOne(user);
@@ -173,7 +173,7 @@ export async function POST(request, { params }) {
         user: {
           id: userId,
           username,
-          createdAt: user.createdAt
+          createdAt: user.created_at // Return as createdAt for frontend consistency
         }
       }));
     }
