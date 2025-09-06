@@ -77,7 +77,7 @@ export default function AuthForm({ onAuthSuccess }) {
           
           <TabsContent value="login">
             <form onSubmit={(e) => handleSubmit(e, true)}>
-              <CardContent className="space-y-4">
+              <CardContent className="space-y-4 px-6">
                 <div className="space-y-2">
                   <Label htmlFor="login-username">Username</Label>
                   <div className="relative">
@@ -113,7 +113,7 @@ export default function AuthForm({ onAuthSuccess }) {
                 </div>
               </CardContent>
               
-              <CardFooter className="flex flex-col space-y-4">
+              <CardFooter className="flex flex-col space-y-4 px-6">
                 <Button
                   type="submit"
                   className="w-full"
@@ -134,7 +134,7 @@ export default function AuthForm({ onAuthSuccess }) {
           
           <TabsContent value="register">
             <form onSubmit={(e) => handleSubmit(e, false)}>
-              <CardContent className="space-y-4">
+              <CardContent className="space-y-4 px-6">
                 <div className="space-y-2">
                   <Label htmlFor="register-username">Username</Label>
                   <div className="relative">
@@ -171,7 +171,7 @@ export default function AuthForm({ onAuthSuccess }) {
                 </div>
               </CardContent>
               
-              <CardFooter className="flex flex-col space-y-4">
+              <CardFooter className="flex flex-col space-y-4 px-6">
                 <Button
                   type="submit"
                   className="w-full"
