@@ -61,8 +61,8 @@ export default function AuthForm({ onAuthSuccess }) {
 
   return (
     <div className="flex items-center justify-center min-h-screen p-4">
-      <Card className="w-full max-w-md">
-        <CardHeader className="text-center">
+      <Card className="w-full max-w-md mx-auto">
+        <CardHeader className="text-center px-6">
           <CardTitle className="text-2xl font-bold">🍴 Forkcast</CardTitle>
           <CardDescription>
             Your personal meal planning companion
