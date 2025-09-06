@@ -72,28 +72,32 @@ export async function GET(request, { params }) {
         ];
       }
 
-      const meals = await db.collection('meals')
-        .find(query)
-        .sort({ createdAt: -1 })
-        .skip(skip)
-        .limit(limit)
-        .toArray();
+      try {
+        const mealsResult = await db.collection('meals').find(query);
+        
+        // Handle both array response and MongoDB-style chaining
+        let meals;
+        if (Array.isArray(mealsResult)) {
+          meals = mealsResult.slice(skip, skip + limit);
+        } else if (mealsResult.sort) {
+          meals = await mealsResult
+            .sort({ createdAt: -1 })
+            .skip(skip)
+            .limit(limit)
+            .toArray();
+        } else {
+          // Fallback for other response types
+          meals = [];
+        }
 
-      // Get user info for each meal
-      const mealsWithUsers = await Promise.all(
-        meals.map(async (meal) => {
-          const userData = await db.collection('users').findOne(
-            { id: meal.userId },
-            { projection: { id: 1, username: 1 } }
-          );
-          return {
-            ...meal,
-            user: userData || { username: 'Unknown User' }
-          };
-        })
-      );
-
-      return withCors(NextResponse.json(mealsWithUsers));
+        return withCors(NextResponse.json(meals));
+      } catch (error) {
+        console.error('Error fetching meals:', error);
+        return withCors(NextResponse.json({ 
+          error: 'Failed to fetch meals',
+          details: error.message 
+        }, { status: 500 }));
+      }
     }
 
     if (path.startsWith('meals/') && path.split('/').length === 2) {
