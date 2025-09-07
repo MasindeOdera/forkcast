@@ -57,7 +57,7 @@ export default function MealCard({ meal, currentUserId, onEdit, onDelete, onAddT
       const { jsPDF } = await import('jspdf');
       const html2canvas = (await import('html2canvas')).default;
       
-      // Create a temporary container for PDF content
+      // Create a temporary container for PDF content with automatic height
       const tempDiv = document.createElement('div');
       tempDiv.style.position = 'absolute';
       tempDiv.style.left = '-9999px';
@@ -65,6 +65,7 @@ export default function MealCard({ meal, currentUserId, onEdit, onDelete, onAddT
       tempDiv.style.padding = '40px';
       tempDiv.style.backgroundColor = 'white';
       tempDiv.style.fontFamily = 'Arial, sans-serif';
+      tempDiv.style.minHeight = 'auto'; // Allow natural height
       
       tempDiv.innerHTML = `
         <div style="text-align: center; margin-bottom: 30px;">
@@ -95,7 +96,7 @@ export default function MealCard({ meal, currentUserId, onEdit, onDelete, onAddT
           <h2 style="color: #2D5016; font-size: 18px; margin-bottom: 15px; border-bottom: 2px solid #2D5016; padding-bottom: 5px;">👨‍🍳 Instructions</h2>
           <ol style="padding-left: 20px; margin: 0;">
             ${formatInstructions(meal.instructions).map((instruction, index) => 
-              `<li style="margin-bottom: 12px; line-height: 1.6;">
+              `<li style="margin-bottom: 12px; line-height: 1.6; page-break-inside: avoid;">
                 <strong style="color: #2D5016;">Step ${index + 1}:</strong> ${instruction}
               </li>`
             ).join('')}
@@ -109,30 +110,107 @@ export default function MealCard({ meal, currentUserId, onEdit, onDelete, onAddT
       
       document.body.appendChild(tempDiv);
       
-      // Convert to canvas
+      // Wait for any images to load
+      const images = tempDiv.querySelectorAll('img');
+      await Promise.all(Array.from(images).map(img => {
+        if (img.complete) return Promise.resolve();
+        return new Promise((resolve, reject) => {
+          img.onload = resolve;
+          img.onerror = resolve; // Continue even if image fails
+          setTimeout(resolve, 2000); // Timeout after 2 seconds
+        });
+      }));
+      
+      // Convert to canvas with proper sizing
       const canvas = await html2canvas(tempDiv, {
-        scale: 2,
+        scale: 1.5, // Reduced scale for better performance
         useCORS: true,
         allowTaint: true,
         backgroundColor: 'white',
         width: 800,
-        windowWidth: 800
+        windowWidth: 800,
+        height: tempDiv.scrollHeight, // Use actual content height
+        logging: false // Disable logging for cleaner output
       });
       
       // Clean up
       document.body.removeChild(tempDiv);
       
-      // Create PDF
+      // Create PDF with proper multi-page handling
       const pdf = new jsPDF('p', 'mm', 'a4');
-      const imgWidth = 210; // A4 width in mm
+      const pageWidth = 210; // A4 width in mm
       const pageHeight = 297; // A4 height in mm
+      const margin = 10; // 10mm margin
+      const usableWidth = pageWidth - (margin * 2);
+      const usableHeight = pageHeight - (margin * 2);
+      
+      // Calculate image dimensions
+      const imgWidth = usableWidth;
       const imgHeight = (canvas.height * imgWidth) / canvas.width;
       
-      // Add the canvas as image to PDF
-      pdf.addImage(canvas.toDataURL('image/png'), 'PNG', 0, 0, imgWidth, imgHeight);
+      // If content fits on one page
+      if (imgHeight <= usableHeight) {
+        pdf.addImage(
+          canvas.toDataURL('image/png', 0.8), 
+          'PNG', 
+          margin, 
+          margin, 
+          imgWidth, 
+          imgHeight
+        );
+      } else {
+        // Split content across multiple pages
+        const totalPages = Math.ceil(imgHeight / usableHeight);
+        
+        for (let i = 0; i < totalPages; i++) {
+          if (i > 0) {
+            pdf.addPage();
+          }
+          
+          // Calculate the portion of the canvas to use for this page
+          const sourceY = (canvas.height / totalPages) * i;
+          const sourceHeight = canvas.height / totalPages;
+          
+          // Create a temporary canvas for this page section
+          const pageCanvas = document.createElement('canvas');
+          const pageCtx = pageCanvas.getContext('2d');
+          
+          pageCanvas.width = canvas.width;
+          pageCanvas.height = sourceHeight;
+          
+          // Draw the portion of the original canvas
+          pageCtx.drawImage(
+            canvas,
+            0, sourceY, canvas.width, sourceHeight, // Source
+            0, 0, canvas.width, sourceHeight         // Destination
+          );
+          
+          // Add this page to the PDF
+          const pageImgHeight = usableHeight;
+          pdf.addImage(
+            pageCanvas.toDataURL('image/png', 0.8),
+            'PNG',
+            margin,
+            margin,
+            imgWidth,
+            pageImgHeight
+          );
+          
+          // Add page numbers (except for single page)
+          if (totalPages > 1) {
+            pdf.setFontSize(8);
+            pdf.setTextColor(128, 128, 128);
+            pdf.text(
+              `Page ${i + 1} of ${totalPages}`,
+              pageWidth - margin - 20,
+              pageHeight - 5
+            );
+          }
+        }
+      }
       
       // Download the PDF
-      const fileName = `${meal.title.replace(/[^a-zA-Z0-9]/g, '_')}_recipe.pdf`;
+      const fileName = `${meal.title.replace(/[^a-zA-Z0-9\s]/g, '_').replace(/\s+/g, '_')}_recipe.pdf`;
       pdf.save(fileName);
       
     } catch (error) {
