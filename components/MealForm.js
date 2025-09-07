@@ -158,6 +158,17 @@ export default function MealForm({
           </div>
 
           <div className="space-y-2">
+            <Label>Gallery Photos (Optional)</Label>
+            <GalleryUpload
+              onGalleryChange={handleGalleryUpload}
+              existingImages={formData.galleryImages}
+            />
+            <p className="text-xs text-muted-foreground">
+              Add extra photos to showcase your meal from different angles
+            </p>
+          </div>
+
+          <div className="space-y-2">
             <Label htmlFor="ingredients">Ingredients *</Label>
             <Textarea
               id="ingredients"
