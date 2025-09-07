@@ -304,7 +304,10 @@ class ForkcastAPITester:
             verify_response = self.session.get(verify_url)
             print(f"DEBUG: Verification GET response: {verify_response.status_code}")
             if verify_response.status_code == 200:
-                print(f"DEBUG: Meal exists, proceeding with update")
+                meal_data = verify_response.json()
+                print(f"DEBUG: Meal exists, meal userId: {meal_data.get('userId')}")
+                print(f"DEBUG: Current user ID: {self.user_data.get('id')}")
+                print(f"DEBUG: UserIds match: {meal_data.get('userId') == self.user_data.get('id')}")
             else:
                 print(f"DEBUG: Meal verification failed: {verify_response.text}")
             
