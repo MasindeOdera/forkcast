@@ -57,155 +57,224 @@ export default function MealCard({ meal, currentUserId, onEdit, onDelete, onAddT
       const { jsPDF } = await import('jspdf');
       const html2canvas = (await import('html2canvas')).default;
       
-      // Create a temporary container for PDF content with automatic height
-      const tempDiv = document.createElement('div');
-      tempDiv.style.position = 'absolute';
-      tempDiv.style.left = '-9999px';
-      tempDiv.style.width = '800px';
-      tempDiv.style.padding = '40px';
-      tempDiv.style.backgroundColor = 'white';
-      tempDiv.style.fontFamily = 'Arial, sans-serif';
-      tempDiv.style.minHeight = 'auto'; // Allow natural height
-      
-      tempDiv.innerHTML = `
-        <div style="text-align: center; margin-bottom: 30px;">
-          <h1 style="color: #2D5016; font-size: 28px; margin-bottom: 10px; font-weight: bold;">${meal.title}</h1>
-          <p style="color: #666; font-size: 14px; margin: 5px 0;">by ${meal.user?.username || 'Unknown'}</p>
-          <p style="color: #888; font-size: 12px;">Generated from Forkcast • ${new Date().toLocaleDateString()}</p>
-        </div>
-        
-        ${allImages.length > 0 ? `
-          <div style="text-align: center; margin-bottom: 30px;">
-            <img src="${allImages[0]}" style="max-width: 100%; height: 200px; object-fit: cover; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);" />
-          </div>
-        ` : ''}
-        
-        <div style="margin-bottom: 25px;">
-          <h2 style="color: #2D5016; font-size: 18px; margin-bottom: 15px; border-bottom: 2px solid #2D5016; padding-bottom: 5px;">🥘 Ingredients</h2>
-          <ul style="list-style: none; padding: 0; margin: 0;">
-            ${formatIngredients(meal.ingredients).map(ingredient => 
-              `<li style="margin-bottom: 8px; padding-left: 20px; position: relative;">
-                <span style="position: absolute; left: 0; color: #2D5016; font-weight: bold;">•</span>
-                ${ingredient}
-              </li>`
-            ).join('')}
-          </ul>
-        </div>
-        
-        <div style="margin-bottom: 25px;">
-          <h2 style="color: #2D5016; font-size: 18px; margin-bottom: 15px; border-bottom: 2px solid #2D5016; padding-bottom: 5px;">👨‍🍳 Instructions</h2>
-          <ol style="padding-left: 20px; margin: 0;">
-            ${formatInstructions(meal.instructions).map((instruction, index) => 
-              `<li style="margin-bottom: 12px; line-height: 1.6; page-break-inside: avoid;">
-                <strong style="color: #2D5016;">Step ${index + 1}:</strong> ${instruction}
-              </li>`
-            ).join('')}
-          </ol>
-        </div>
-        
-        <div style="text-align: center; margin-top: 40px; padding-top: 20px; border-top: 1px solid #eee; color: #888; font-size: 12px;">
-          <p>🍴 Happy cooking! Visit Forkcast for more delicious recipes.</p>
-        </div>
-      `;
-      
-      document.body.appendChild(tempDiv);
-      
-      // Wait for any images to load
-      const images = tempDiv.querySelectorAll('img');
-      await Promise.all(Array.from(images).map(img => {
-        if (img.complete) return Promise.resolve();
-        return new Promise((resolve, reject) => {
-          img.onload = resolve;
-          img.onerror = resolve; // Continue even if image fails
-          setTimeout(resolve, 2000); // Timeout after 2 seconds
-        });
-      }));
-      
-      // Convert to canvas with proper sizing
-      const canvas = await html2canvas(tempDiv, {
-        scale: 1.5, // Reduced scale for better performance
-        useCORS: true,
-        allowTaint: true,
-        backgroundColor: 'white',
-        width: 800,
-        windowWidth: 800,
-        height: tempDiv.scrollHeight, // Use actual content height
-        logging: false // Disable logging for cleaner output
-      });
-      
-      // Clean up
-      document.body.removeChild(tempDiv);
-      
-      // Create PDF with proper multi-page handling
+      // Create PDF with proper text-aware page breaking
       const pdf = new jsPDF('p', 'mm', 'a4');
       const pageWidth = 210; // A4 width in mm
       const pageHeight = 297; // A4 height in mm
-      const margin = 10; // 10mm margin
-      const usableWidth = pageWidth - (margin * 2);
-      const usableHeight = pageHeight - (margin * 2);
+      const margin = 15; // Increased margin for better spacing
+      const lineHeight = 6; // Line height in mm
+      const maxWidth = pageWidth - (margin * 2);
       
-      // Calculate image dimensions
-      const imgWidth = usableWidth;
-      const imgHeight = (canvas.height * imgWidth) / canvas.width;
+      let currentY = margin;
+      let currentPage = 1;
       
-      // If content fits on one page
-      if (imgHeight <= usableHeight) {
-        pdf.addImage(
-          canvas.toDataURL('image/png', 0.8), 
-          'PNG', 
-          margin, 
-          margin, 
-          imgWidth, 
-          imgHeight
-        );
-      } else {
-        // Split content across multiple pages
-        const totalPages = Math.ceil(imgHeight / usableHeight);
+      // Helper function to add new page if needed
+      const checkPageBreak = (requiredHeight) => {
+        if (currentY + requiredHeight > pageHeight - margin - 10) { // 10mm bottom margin
+          pdf.addPage();
+          currentPage++;
+          currentY = margin;
+          return true;
+        }
+        return false;
+      };
+      
+      // Helper function to add text with proper line breaking
+      const addTextBlock = (text, fontSize, isBold = false, isTitle = false) => {
+        pdf.setFontSize(fontSize);
+        pdf.setFont('helvetica', isBold ? 'bold' : 'normal');
         
-        for (let i = 0; i < totalPages; i++) {
-          if (i > 0) {
-            pdf.addPage();
+        if (isTitle) {
+          // Center title
+          const textWidth = pdf.getTextWidth(text);
+          const startX = (pageWidth - textWidth) / 2;
+          checkPageBreak(lineHeight * 2);
+          pdf.text(text, startX, currentY);
+          currentY += lineHeight * 1.5;
+        } else {
+          // Wrap text to fit width
+          const lines = pdf.splitTextToSize(text, maxWidth);
+          
+          // Check if we need a new page for this text block
+          const blockHeight = lines.length * lineHeight;
+          checkPageBreak(blockHeight + 5); // Extra spacing
+          
+          // Add each line
+          lines.forEach(line => {
+            pdf.text(line, margin, currentY);
+            currentY += lineHeight;
+          });
+          currentY += 3; // Extra spacing after text block
+        }
+      };
+      
+      // Helper function to add section header
+      const addSectionHeader = (title, emoji) => {
+        checkPageBreak(lineHeight * 2);
+        pdf.setFontSize(16);
+        pdf.setFont('helvetica', 'bold');
+        pdf.setTextColor(45, 80, 22); // Green color
+        
+        // Add emoji and title
+        pdf.text(`${emoji} ${title}`, margin, currentY);
+        currentY += lineHeight;
+        
+        // Add underline
+        pdf.setDrawColor(45, 80, 22);
+        pdf.setLineWidth(0.5);
+        pdf.line(margin, currentY, pageWidth - margin, currentY);
+        currentY += lineHeight;
+        
+        // Reset color
+        pdf.setTextColor(0, 0, 0);
+      };
+      
+      // Helper function to add list items
+      const addListItems = (items, isNumbered = false) => {
+        items.forEach((item, index) => {
+          const prefix = isNumbered ? `${index + 1}. ` : '• ';
+          const fullText = `${prefix}${item}`;
+          
+          // Calculate required height for this item
+          pdf.setFontSize(11);
+          const lines = pdf.splitTextToSize(fullText, maxWidth - 10);
+          const itemHeight = lines.length * lineHeight;
+          
+          // Check if we need a new page
+          checkPageBreak(itemHeight + 2);
+          
+          // Add the item
+          if (isNumbered) {
+            pdf.setFont('helvetica', 'bold');
+            pdf.text(`Step ${index + 1}:`, margin, currentY);
+            pdf.setFont('helvetica', 'normal');
+            
+            // Add instruction text with proper wrapping
+            const instructionLines = pdf.splitTextToSize(item, maxWidth - 20);
+            let stepY = currentY;
+            instructionLines.forEach(line => {
+              pdf.text(line, margin + 20, stepY);
+              stepY += lineHeight;
+            });
+            currentY = stepY + 2;
+          } else {
+            // Ingredient with bullet point
+            pdf.text('•', margin, currentY);
+            const ingredientLines = pdf.splitTextToSize(item, maxWidth - 10);
+            let ingredientY = currentY;
+            ingredientLines.forEach(line => {
+              pdf.text(line, margin + 10, ingredientY);
+              ingredientY += lineHeight;
+            });
+            currentY = ingredientY + 1;
           }
+        });
+      };
+      
+      // Start building the PDF
+      pdf.setFont('helvetica', 'normal');
+      
+      // Title section
+      currentY = margin + 10;
+      pdf.setFontSize(20);
+      pdf.setFont('helvetica', 'bold');
+      pdf.setTextColor(45, 80, 22);
+      addTextBlock(meal.title, 20, true, true);
+      
+      // Author and date
+      pdf.setFontSize(12);
+      pdf.setTextColor(100, 100, 100);
+      addTextBlock(`by ${meal.user?.username || 'Unknown'}`, 12, false, true);
+      addTextBlock(`Generated from Forkcast • ${new Date().toLocaleDateString()}`, 10, false, true);
+      
+      currentY += 10; // Extra space after header
+      
+      // Add image if available
+      if (allImages.length > 0) {
+        try {
+          checkPageBreak(60); // Reserve space for image
           
-          // Calculate the portion of the canvas to use for this page
-          const sourceY = (canvas.height / totalPages) * i;
-          const sourceHeight = canvas.height / totalPages;
+          // Create a temporary image element
+          const img = new Image();
+          img.crossOrigin = 'anonymous';
           
-          // Create a temporary canvas for this page section
-          const pageCanvas = document.createElement('canvas');
-          const pageCtx = pageCanvas.getContext('2d');
-          
-          pageCanvas.width = canvas.width;
-          pageCanvas.height = sourceHeight;
-          
-          // Draw the portion of the original canvas
-          pageCtx.drawImage(
-            canvas,
-            0, sourceY, canvas.width, sourceHeight, // Source
-            0, 0, canvas.width, sourceHeight         // Destination
+          await new Promise((resolve, reject) => {
+            img.onload = () => {
+              try {
+                // Create canvas for image
+                const canvas = document.createElement('canvas');
+                const ctx = canvas.getContext('2d');
+                
+                // Calculate image dimensions (max 50mm height)
+                const maxImageHeight = 50;
+                const aspectRatio = img.width / img.height;
+                const imageHeight = Math.min(maxImageHeight, maxWidth / aspectRatio);
+                const imageWidth = imageHeight * aspectRatio;
+                
+                canvas.width = imageWidth * 4; // Higher resolution
+                canvas.height = imageHeight * 4;
+                
+                ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                
+                // Add to PDF
+                const imageX = (pageWidth - imageWidth) / 2; // Center image
+                pdf.addImage(
+                  canvas.toDataURL('image/jpeg', 0.8),
+                  'JPEG',
+                  imageX,
+                  currentY,
+                  imageWidth,
+                  imageHeight
+                );
+                
+                currentY += imageHeight + 10;
+                resolve();
+              } catch (err) {
+                resolve(); // Continue even if image fails
+              }
+            };
+            img.onerror = () => resolve(); // Continue even if image fails
+            img.src = allImages[0];
+            
+            // Timeout after 3 seconds
+            setTimeout(resolve, 3000);
+          });
+        } catch (error) {
+          console.log('Image loading failed, continuing without image');
+        }
+      }
+      
+      // Ingredients section
+      addSectionHeader('Ingredients', '🥘');
+      const ingredients = formatIngredients(meal.ingredients);
+      addListItems(ingredients, false);
+      
+      currentY += 5; // Extra space between sections
+      
+      // Instructions section
+      addSectionHeader('Instructions', '👨‍🍳');
+      const instructions = formatInstructions(meal.instructions);
+      addListItems(instructions, true);
+      
+      // Footer
+      checkPageBreak(20);
+      currentY = Math.max(currentY + 10, pageHeight - 30);
+      
+      pdf.setFontSize(10);
+      pdf.setTextColor(150, 150, 150);
+      pdf.text('🍴 Happy cooking! Visit Forkcast for more delicious recipes.', margin, currentY);
+      
+      // Add page numbers if multiple pages
+      if (currentPage > 1) {
+        for (let i = 1; i <= currentPage; i++) {
+          pdf.setPage(i);
+          pdf.setFontSize(8);
+          pdf.setTextColor(128, 128, 128);
+          pdf.text(
+            `Page ${i} of ${currentPage}`,
+            pageWidth - margin - 20,
+            pageHeight - 5
           );
-          
-          // Add this page to the PDF
-          const pageImgHeight = usableHeight;
-          pdf.addImage(
-            pageCanvas.toDataURL('image/png', 0.8),
-            'PNG',
-            margin,
-            margin,
-            imgWidth,
-            pageImgHeight
-          );
-          
-          // Add page numbers (except for single page)
-          if (totalPages > 1) {
-            pdf.setFontSize(8);
-            pdf.setTextColor(128, 128, 128);
-            pdf.text(
-              `Page ${i + 1} of ${totalPages}`,
-              pageWidth - margin - 20,
-              pageHeight - 5
-            );
-          }
         }
       }
       
