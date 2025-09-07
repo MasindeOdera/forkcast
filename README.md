@@ -235,31 +235,45 @@ CREATE TABLE meal_plans (
 ## 🔧 API Endpoints
 
 ### Authentication
-- `POST /api/auth/register` - User registration
-- `POST /api/auth/login` - User login
-- `GET /api/users/me` - Get current user info
+- `POST /api/auth/register` - User registration with validation
+- `POST /api/auth/login` - User login with JWT generation
+- `GET /api/users/me` - Get current user info (authenticated)
 
 ### Meals
-- `GET /api/meals` - Get all meals (with optional filters)
-- `POST /api/meals` - Create new meal
-- `GET /api/meals/{id}` - Get specific meal
+- `GET /api/meals` - Get all meals (with optional filters and pagination)
+- `POST /api/meals` - Create new meal with gallery support
+- `GET /api/meals/{id}` - Get specific meal with user details
 - `PUT /api/meals/{id}` - Update meal (owner only)
-- `DELETE /api/meals/{id}` - Delete meal (owner only)
+- `DELETE /api/meals/{id}` - Delete meal with Cloudinary cleanup (owner only)
+- `GET /api/meals?userId={id}` - Get meals by specific user
+
+### Meal Planning (New)
+- `GET /api/meal-plans` - Get meal plans for date range
+- `POST /api/meal-plans` - Create/update meal plan for specific date and meal type
+- `DELETE /api/meal-plans` - Remove meal from plan
 
 ### File Upload
-- `POST /api/upload` - Upload image to Cloudinary
+- `POST /api/upload` - Upload image to Cloudinary with validation
 
 ### AI Features
-- `POST /api/meal-suggestions` - Get AI-powered meal suggestions
+- `POST /api/meal-suggestions` - Get AI-powered meal suggestions with enhanced parsing
 
 ## 🎨 UI Components
 
-### Key Components
-- `AuthForm` - Login/registration form with validation
-- `MealCard` - Meal display card with actions
-- `MealForm` - Create/edit meal form with image upload
-- `ImageUpload` - Cloudinary image upload component
-- `MealSuggestions` - AI-powered meal suggestion interface
+### Enhanced Components
+- `AuthForm` - Login/registration form with password visibility toggle
+- `MealCard` - Meal display card with gallery navigation and placeholder images
+- `MealForm` - Create/edit meal form with multi-image upload support
+- `MealPlanningCalendar` - Interactive weekly calendar with drag-and-drop
+- `MealSuggestions` - Enhanced AI interface with draggable meal cards
+- `ImageUpload` - Cloudinary single image upload component
+- `GalleryUpload` - Multiple image upload with thumbnail preview
+
+### New Components
+- `MealSuggestionForm` - AI meal suggestion form with dietary preferences
+- Enhanced meal selector dialogs with community integration
+- Placeholder image components with ChefHat icons
+- Drag-and-drop meal cards with visual feedback
 
 ### Design System
 - **Colors**: Semantic color system with dark mode support
