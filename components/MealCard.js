@@ -109,14 +109,14 @@ export default function MealCard({ meal, currentUserId, onEdit, onDelete, onAddT
       };
       
       // Helper function to add section header
-      const addSectionHeader = (title, emoji) => {
+      const addSectionHeader = (title, icon) => {
         checkPageBreak(lineHeight * 2);
         pdf.setFontSize(16);
         pdf.setFont('helvetica', 'bold');
         pdf.setTextColor(45, 80, 22); // Green color
         
-        // Add emoji and title
-        pdf.text(`${emoji} ${title}`, margin, currentY);
+        // Add icon and title (using text alternatives instead of emojis)
+        pdf.text(`${icon} ${title}`, margin, currentY);
         currentY += lineHeight;
         
         // Add underline
