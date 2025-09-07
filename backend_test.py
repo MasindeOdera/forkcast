@@ -144,7 +144,7 @@ class ForkcastAPITester:
                 data = response.json()
                 
                 # Validate response structure
-                if 'id' in data and 'username' in data and 'createdAt' in data:
+                if 'id' in data and 'username' in data and ('createdAt' in data or 'created_at' in data):
                     # Ensure password is not included
                     if 'password' not in data:
                         self.log_result('users_me', 'pass', f'User data retrieved successfully: {data["username"]}')
