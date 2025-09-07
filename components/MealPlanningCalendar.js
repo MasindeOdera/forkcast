@@ -599,7 +599,6 @@ export default function MealPlanningCalendar() {
                         >
                           <CardContent className="p-4">
                             <div className="flex items-center gap-3">
-                            <div className="flex items-center gap-3">
                               {(() => {
                                 // Get first available image from main image or gallery
                                 const allImages = [
