@@ -7,12 +7,19 @@ import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { User, Clock, ChefHat, Eye, Edit, Trash2 } from 'lucide-react';
+import { User, Clock, ChefHat, Eye, Edit, Trash2, ChevronLeft, ChevronRight, Images } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 
 export default function MealCard({ meal, currentUserId, onEdit, onDelete }) {
   const [showDetails, setShowDetails] = useState(false);
+  const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const isOwner = meal.userId === currentUserId;
+
+  // Combine main image and gallery images
+  const allImages = [
+    ...(meal.imageUrl ? [meal.imageUrl] : []),
+    ...(meal.galleryImages || [])
+  ];
 
   const formatIngredients = (ingredients) => {
     if (typeof ingredients === 'string') {
@@ -28,15 +35,64 @@ export default function MealCard({ meal, currentUserId, onEdit, onDelete }) {
     return Array.isArray(instructions) ? instructions : [];
   };
 
+  const navigateImage = (direction) => {
+    if (allImages.length <= 1) return;
+    
+    setCurrentImageIndex(prev => {
+      if (direction === 'next') {
+        return prev === allImages.length - 1 ? 0 : prev + 1;
+      } else {
+        return prev === 0 ? allImages.length - 1 : prev - 1;
+      }
+    });
+  };
+
   return (
     <Card className="overflow-hidden hover:shadow-lg transition-shadow">
-      {meal.imageUrl && (
-        <div className="aspect-video relative overflow-hidden">
+      {/* Image Section with Gallery Navigation */}
+      {allImages.length > 0 && (
+        <div className="aspect-video relative overflow-hidden group">
           <img
-            src={meal.imageUrl}
+            src={allImages[currentImageIndex]}
             alt={meal.title}
             className="w-full h-full object-cover"
           />
+          
+          {/* Image Navigation */}
+          {allImages.length > 1 && (
+            <>
+              <Button
+                variant="secondary"
+                size="sm"
+                className="absolute left-2 top-1/2 transform -translate-y-1/2 h-8 w-8 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                onClick={() => navigateImage('prev')}
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              
+              <Button
+                variant="secondary"
+                size="sm"
+                className="absolute right-2 top-1/2 transform -translate-y-1/2 h-8 w-8 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                onClick={() => navigateImage('next')}
+              >
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+              
+              {/* Image Counter */}
+              <div className="absolute bottom-2 right-2 bg-black/50 text-white px-2 py-1 rounded text-xs opacity-0 group-hover:opacity-100 transition-opacity">
+                {currentImageIndex + 1} / {allImages.length}
+              </div>
+            </>
+          )}
+          
+          {/* Gallery Badge */}
+          {allImages.length > 1 && (
+            <Badge className="absolute top-2 left-2 bg-black/50 text-white border-none">
+              <Images className="h-3 w-3 mr-1" />
+              {allImages.length}
+            </Badge>
+          )}
         </div>
       )}
       
@@ -85,6 +141,15 @@ export default function MealCard({ meal, currentUserId, onEdit, onDelete }) {
             <span className="text-sm font-medium">
               {formatIngredients(meal.ingredients).length} ingredients
             </span>
+            {allImages.length > 1 && (
+              <>
+                <span>•</span>
+                <Images className="h-4 w-4 text-muted-foreground" />
+                <span className="text-sm text-muted-foreground">
+                  {allImages.length} photos
+                </span>
+              </>
+            )}
           </div>
           
           <p className="text-sm text-muted-foreground line-clamp-2">
@@ -116,12 +181,34 @@ export default function MealCard({ meal, currentUserId, onEdit, onDelete }) {
             
             <ScrollArea className="max-h-[60vh]">
               <div className="space-y-6">
-                {meal.imageUrl && (
-                  <img
-                    src={meal.imageUrl}
-                    alt={meal.title}
-                    className="w-full h-64 object-cover rounded-lg"
-                  />
+                {/* Gallery Section in Dialog */}
+                {allImages.length > 0 && (
+                  <div className="space-y-4">
+                    <img
+                      src={allImages[currentImageIndex]}
+                      alt={meal.title}
+                      className="w-full h-64 object-cover rounded-lg"
+                    />
+                    
+                    {/* Thumbnail Navigation */}
+                    {allImages.length > 1 && (
+                      <div className="flex gap-2 overflow-x-auto pb-2">
+                        {allImages.map((image, index) => (
+                          <img
+                            key={index}
+                            src={image}
+                            alt={`${meal.title} ${index + 1}`}
+                            className={`w-16 h-16 object-cover rounded cursor-pointer flex-shrink-0 border-2 transition-all ${
+                              index === currentImageIndex 
+                                ? 'border-primary ring-2 ring-primary/20' 
+                                : 'border-transparent hover:border-muted-foreground'
+                            }`}
+                            onClick={() => setCurrentImageIndex(index)}
+                          />
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 )}
                 
                 <div>
