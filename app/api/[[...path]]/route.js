@@ -458,7 +458,7 @@ export async function PUT(request, { params }) {
 
     if (path.startsWith('meals/') && path.split('/').length === 2) {
       const mealId = path.split('/')[1];
-      const { title, ingredients, instructions, imageUrl } = await request.json();
+      const { title, ingredients, instructions, imageUrl, galleryImages } = await request.json();
       
       console.log(`DEBUG PUT: mealId=${mealId}, userId=${user.userId}`);
       
