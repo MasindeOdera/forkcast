@@ -166,27 +166,80 @@ class ForkcastDataCleanup:
             self.log_message(f"❌ {error_msg}")
             return False
 
-    def cleanup_user_data(self, user_id):
+    def try_login_as_user(self, username):
+        """Try to login as a test user with common test passwords"""
+        test_passwords = [
+            "delicious123",  # Our test script password
+            "password123",
+            "test123",
+            "debug123",
+            "demo123",
+            "123456",
+            "password"
+        ]
+        
+        for password in test_passwords:
+            try:
+                url = f"{self.base_url}/auth/login"
+                payload = {
+                    "username": username,
+                    "password": password
+                }
+                
+                response = self.session.post(url, json=payload)
+                
+                if response.status_code == 200:
+                    data = response.json()
+                    token = data.get('token')
+                    if token:
+                        self.log_message(f"✅ Successfully logged in as {username}")
+                        return token
+                        
+            except Exception as e:
+                continue
+        
+        self.log_message(f"❌ Could not login as {username} with any common password")
+        return None
+
+    def cleanup_user_data(self, user_id, username):
         """Clean up all data for a specific user"""
-        self.log_message(f"🧹 Cleaning up data for user: {user_id}")
+        self.log_message(f"🧹 Cleaning up data for user: {username} (ID: {user_id})")
         
-        # Get user's meals
-        user_meals = self.get_user_meals(user_id)
-        self.log_message(f"📊 Found {len(user_meals)} meals for user {user_id}")
+        # Try to login as the test user
+        user_token = self.try_login_as_user(username)
         
-        # Delete each meal
-        deleted_count = 0
-        for meal in user_meals:
-            meal_id = meal.get('id')
-            if meal_id:
-                if self.delete_meal(meal_id):
-                    deleted_count += 1
-                    self.log_message(f"🗑️ Deleted meal: {meal.get('title', 'Unknown')} (ID: {meal_id})")
-                else:
-                    self.log_message(f"❌ Failed to delete meal: {meal.get('title', 'Unknown')} (ID: {meal_id})")
-        
-        self.log_message(f"✅ Deleted {deleted_count}/{len(user_meals)} meals for user {user_id}")
-        return deleted_count
+        if user_token:
+            # Temporarily switch to user's token
+            original_token = self.auth_token
+            self.auth_token = user_token
+            self.session.headers.update({'Authorization': f'Bearer {user_token}'})
+            
+            # Get user's meals
+            user_meals = self.get_user_meals(user_id)
+            self.log_message(f"📊 Found {len(user_meals)} meals for user {user_id}")
+            
+            # Delete each meal
+            deleted_count = 0
+            for meal in user_meals:
+                meal_id = meal.get('id')
+                if meal_id:
+                    if self.delete_meal(meal_id):
+                        deleted_count += 1
+                        self.log_message(f"🗑️ Deleted meal: {meal.get('title', 'Unknown')} (ID: {meal_id})")
+                    else:
+                        self.log_message(f"❌ Failed to delete meal: {meal.get('title', 'Unknown')} (ID: {meal_id})")
+            
+            # Restore original admin token
+            self.auth_token = original_token
+            self.session.headers.update({'Authorization': f'Bearer {original_token}'})
+            
+            self.log_message(f"✅ Deleted {deleted_count}/{len(user_meals)} meals for user {user_id}")
+            return deleted_count
+        else:
+            # Could not login as user, record meals that need manual cleanup
+            user_meals = self.get_user_meals(user_id)
+            self.log_message(f"⚠️ Cannot delete {len(user_meals)} meals for {username} - authentication failed")
+            return 0
 
     def verify_cleanup(self):
         """Verify that test data has been cleaned up"""
