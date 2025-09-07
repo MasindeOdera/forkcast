@@ -244,7 +244,7 @@ export async function POST(request, { params }) {
         user: {
           id: user.id,
           username: user.username,
-          createdAt: user.createdAt
+          createdAt: user.created_at || user.createdAt
         }
       }));
     }
