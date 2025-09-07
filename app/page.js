@@ -180,6 +180,33 @@ export default function App() {
     setShowMealForm(true);
   };
 
+  const handleDeleteMeal = async (meal) => {
+    if (!confirm('Are you sure you want to delete this meal?')) {
+      return;
+    }
+
+    try {
+      const token = localStorage.getItem('forkcast_token');
+      const response = await fetch(`/api/meals/${meal.id}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to delete meal');
+      }
+
+      toast.success('Meal deleted successfully');
+      await loadMeals();
+    } catch (error) {
+      console.error('Error deleting meal:', error);
+      toast.error(error.message);
+    }
+  };
+
   const handleAddToMealPlan = async (meal) => {
     try {
       const token = localStorage.getItem('forkcast_token');
