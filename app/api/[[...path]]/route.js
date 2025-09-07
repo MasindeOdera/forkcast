@@ -533,6 +533,41 @@ export async function DELETE(request, { params }) {
       return withCors(NextResponse.json({ message: 'Meal deleted successfully' }));
     }
 
+    if (path === 'meal-plans') {
+      const user = getUserFromToken(request);
+      if (!user) {
+        return withCors(NextResponse.json({ error: 'Unauthorized' }, { status: 401 }));
+      }
+
+      try {
+        const { date, mealType } = await request.json();
+        
+        if (!date || !mealType) {
+          return withCors(NextResponse.json({ 
+            error: 'Date and meal type are required' 
+          }, { status: 400 }));
+        }
+
+        const result = await db.collection('meal_plans').deleteOne({
+          userId: user.userId,
+          date,
+          mealType
+        });
+
+        if (result.deletedCount === 0) {
+          return withCors(NextResponse.json({ error: 'Meal plan not found' }, { status: 404 }));
+        }
+
+        return withCors(NextResponse.json({ message: 'Meal plan removed successfully' }));
+      } catch (error) {
+        console.error('Error removing meal plan:', error);
+        return withCors(NextResponse.json({ 
+          error: 'Failed to remove meal plan',
+          details: error.message 
+        }, { status: 500 }));
+      }
+    }
+
     return withCors(NextResponse.json({ error: 'Not found' }, { status: 404 }));
     
   } catch (error) {
