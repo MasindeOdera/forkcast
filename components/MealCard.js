@@ -7,7 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { User, Clock, ChefHat, Eye, Edit, Trash2, ChevronLeft, ChevronRight, Images, Plus } from 'lucide-react';
+import { User, Clock, ChefHat, Eye, Edit, Trash2, ChevronLeft, ChevronRight, Images, Plus, Download, Loader2 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 
 export default function MealCard({ meal, currentUserId, onEdit, onDelete, onAddToMealPlan }) {
