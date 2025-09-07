@@ -424,7 +424,7 @@ export default function App() {
               )}
             </TabsContent>
 
-            <TabsContent value="my-meals" className="space-y-6">
+            <TabsContent value="my-meals" className="space-y-6 animate-fade-in-up">
               {filteredMyMeals.length === 0 ? (
                 <div className="text-center py-12">
                   <ChefHat className="mx-auto h-12 w-12 text-muted-foreground" />
@@ -433,7 +433,7 @@ export default function App() {
                     {searchQuery ? 'No meals match your search' : 'Start building your recipe collection!'}
                   </p>
                   <Button 
-                    className="mt-4"
+                    className="mt-4 button-smooth"
                     onClick={() => {
                       setEditingMeal(null);
                       setShowMealForm(true);
@@ -445,15 +445,16 @@ export default function App() {
                 </div>
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {filteredMyMeals.map((meal) => (
-                    <MealCard
-                      key={meal.id}
-                      meal={meal}
-                      currentUserId={user.id}
-                      onEdit={handleEditMeal}
-                      onDelete={handleDeleteMeal}
-                      onAddToMealPlan={handleAddToMealPlan}
-                    />
+                  {filteredMyMeals.map((meal, index) => (
+                    <div key={meal.id} className="stagger-animation" style={{animationDelay: `${index * 0.1}s`}}>
+                      <MealCard
+                        meal={meal}
+                        currentUserId={user.id}
+                        onEdit={handleEditMeal}
+                        onDelete={handleDeleteMeal}
+                        onAddToMealPlan={handleAddToMealPlan}
+                      />
+                    </div>
                   ))}
                 </div>
               )}
