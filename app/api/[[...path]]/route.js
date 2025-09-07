@@ -489,7 +489,7 @@ export async function PUT(request, { params }) {
       console.log(`DEBUG PUT: updateData=`, updateData);
 
       const result = await db.collection('meals').updateOne(
-        { id: mealId, userId: user.userId },
+        { _id: existingMeal._id },
         { $set: updateData }
       );
 
