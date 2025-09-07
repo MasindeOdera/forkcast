@@ -10,7 +10,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { User, Clock, ChefHat, Eye, Edit, Trash2, ChevronLeft, ChevronRight, Images } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 
-export default function MealCard({ meal, currentUserId, onEdit, onDelete }) {
+export default function MealCard({ meal, currentUserId, onEdit, onDelete, onAddToMealPlan }) {
   const [showDetails, setShowDetails] = useState(false);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const isOwner = meal.userId === currentUserId;
