@@ -188,6 +188,9 @@ backend:
         - working: true
           agent: "testing"
           comment: "PUT /api/meals/{mealId} endpoint tested successfully. Updates meal fields correctly and maintains proper ownership validation. Only allows users to update their own meals."
+        - working: true
+          agent: "testing"
+          comment: "SUPABASE DEBUG TEST COMPLETED: Focused testing of meal update endpoint with debug logging enabled. The Supabase query construction is working correctly - WHERE clause properly finds records using both id and user_id filters. Debug logs show successful query execution with matchedCount=1, modifiedCount=1. No issues found with the updateOne method in supabase-db.js. The endpoint consistently returns 200 status with properly updated meal data."
 
   - task: "Meals API - Delete Meal"
     implemented: true
