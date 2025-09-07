@@ -100,6 +100,33 @@ export async function GET(request, { params }) {
       }
     }
 
+    if (path === 'meal-plans') {
+      const user = getUserFromToken(request);
+      if (!user) {
+        return withCors(NextResponse.json({ error: 'Unauthorized' }, { status: 401 }));
+      }
+
+      const startDate = url.searchParams.get('startDate');
+      const endDate = url.searchParams.get('endDate');
+
+      try {
+        let query = { userId: user.userId };
+        
+        if (startDate && endDate) {
+          query.dateRange = { start: startDate, end: endDate };
+        }
+
+        const mealPlans = await db.collection('meal_plans').find(query);
+        return withCors(NextResponse.json(mealPlans));
+      } catch (error) {
+        console.error('Error fetching meal plans:', error);
+        return withCors(NextResponse.json({ 
+          error: 'Failed to fetch meal plans',
+          details: error.message 
+        }, { status: 500 }));
+      }
+    }
+
     if (path.startsWith('meals/') && path.split('/').length === 2) {
       const mealId = path.split('/')[1];
       const meal = await db.collection('meals').findOne({ id: mealId });
