@@ -49,7 +49,7 @@ MONGO_URL=mongodb://localhost:27017
 DB_NAME=forkcast
 
 # Application
-NEXT_PUBLIC_BASE_URL=https://forkcast-app.preview.emergentagent.com
+NEXT_PUBLIC_BASE_URL=https://forkcast-planner.preview.emergentagent.com
 JWT_SECRET=your_super_secret_jwt_key_for_forkcast_app_2024
 
 # Cloudinary (Image Upload)
@@ -254,7 +254,7 @@ Forkcast is fully responsive and works great on:
 ## 🚀 Deployment
 
 The app is currently deployed and accessible at:
-**https://forkcast-app.preview.emergentagent.com**
+**https://forkcast-planner.preview.emergentagent.com**
 
 For local deployment, ensure all environment variables are properly configured and MongoDB is accessible.
 
