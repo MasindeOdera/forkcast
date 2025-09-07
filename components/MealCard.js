@@ -159,10 +159,10 @@ export default function MealCard({ meal, currentUserId, onEdit, onDelete, onAddT
       </CardContent>
       
       <CardFooter>
-        <div className="flex gap-2 w-full">
+        <div className="flex flex-col gap-2 w-full">
           <Dialog open={showDetails} onOpenChange={setShowDetails}>
             <DialogTrigger asChild>
-              <Button variant="outline" className="flex-1">
+              <Button variant="outline" className="w-full">
                 <Eye className="mr-2 h-4 w-4" />
                 View Recipe
               </Button>
@@ -248,15 +248,15 @@ export default function MealCard({ meal, currentUserId, onEdit, onDelete, onAddT
             </DialogContent>
           </Dialog>
           
-          {/* Add to Meal Plan button for non-owner meals */}
+          {/* Add to Meal Plan button for non-owner meals - now below View Recipe */}
           {!isOwner && onAddToMealPlan && (
             <Button 
               variant="default" 
               size="sm"
               onClick={() => onAddToMealPlan(meal)}
-              className="flex-shrink-0"
+              className="w-full"
             >
-              <Plus className="mr-1 h-3 w-3" />
+              <Plus className="mr-2 h-4 w-4" />
               Add to Plan
             </Button>
           )}
