@@ -22,7 +22,8 @@ export default function MealForm({
     title: '',
     ingredients: '',
     instructions: '',
-    imageUrl: null
+    imageUrl: null,
+    galleryImages: []
   });
 
   // Reset form when dialog opens/closes or initial data changes
