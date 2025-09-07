@@ -9,6 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Loader2, Save, Plus } from 'lucide-react';
 import ImageUpload from './ImageUpload';
+import GalleryUpload from './GalleryUpload';
 
 export default function MealForm({ 
   isOpen, 
