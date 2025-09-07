@@ -185,36 +185,51 @@ Navigate to `http://localhost:3000`
 - **Image Upload**: Direct Cloudinary integration
 
 ### Backend
-- **API Routes**: Next.js API routes with catch-all routing
-- **Database**: MongoDB with native driver
-- **Authentication**: JWT tokens with bcryptjs hashing
-- **File Upload**: Cloudinary integration with validation
-- **AI Integration**: OpenAI-compatible API via Emergent LLM
+- **API Routes**: Next.js API routes with comprehensive catch-all routing
+- **Database**: Supabase (PostgreSQL) with real-time capabilities and MongoDB-style interface
+- **Authentication**: JWT tokens with bcryptjs hashing and secure session management
+- **File Upload**: Cloudinary integration with validation and error handling
+- **AI Integration**: Emergent LLM with OpenAI-compatible API for advanced meal suggestions
+- **Drag & Drop**: Server-side meal plan persistence with calendar integration
 
-### Database Schema
+### Database Schema (Supabase PostgreSQL)
 
-#### Users Collection
-```javascript
-{
-  id: "uuid",
-  username: "string",
-  password: "hashed_string",
-  createdAt: "date"
-}
+#### Users Table
+```sql
+CREATE TABLE users (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  username VARCHAR(50) UNIQUE NOT NULL,
+  password VARCHAR(255) NOT NULL,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
 ```
 
-#### Meals Collection
-```javascript
-{
-  id: "uuid",
-  userId: "uuid",
-  title: "string",
-  ingredients: "string",
-  instructions: "string",
-  imageUrl: "string|null",
-  createdAt: "date",
-  updatedAt: "date"
-}
+#### Meals Table
+```sql
+CREATE TABLE meals (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+  title VARCHAR(255) NOT NULL,
+  ingredients TEXT NOT NULL,
+  instructions TEXT NOT NULL,
+  image_url TEXT,
+  gallery_images JSONB,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+```
+
+#### Meal Plans Table (Calendar Functionality)
+```sql
+CREATE TABLE meal_plans (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+  meal_id UUID REFERENCES meals(id) ON DELETE CASCADE,
+  date DATE NOT NULL,
+  meal_type VARCHAR(20) NOT NULL CHECK (meal_type IN ('breakfast', 'lunch', 'dinner')),
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  UNIQUE(user_id, date, meal_type)
+);
 ```
 
 ## 🔧 API Endpoints
