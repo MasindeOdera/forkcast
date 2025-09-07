@@ -185,7 +185,7 @@ export default function MealForm({
               required
             />
             <p className="text-xs text-muted-foreground">
-              Write clear, step-by-step instructions
+              Write clear, step-by-step instructions. No need to number steps - just separate each step with a line break.
             </p>
           </div>
 
