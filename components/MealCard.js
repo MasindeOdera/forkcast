@@ -49,6 +49,100 @@ export default function MealCard({ meal, currentUserId, onEdit, onDelete, onAddT
     });
   };
 
+  const downloadRecipeAsPDF = async () => {
+    setIsDownloading(true);
+    
+    try {
+      // Dynamically import the PDF libraries
+      const { jsPDF } = await import('jspdf');
+      const html2canvas = (await import('html2canvas')).default;
+      
+      // Create a temporary container for PDF content
+      const tempDiv = document.createElement('div');
+      tempDiv.style.position = 'absolute';
+      tempDiv.style.left = '-9999px';
+      tempDiv.style.width = '800px';
+      tempDiv.style.padding = '40px';
+      tempDiv.style.backgroundColor = 'white';
+      tempDiv.style.fontFamily = 'Arial, sans-serif';
+      
+      tempDiv.innerHTML = `
+        <div style="text-align: center; margin-bottom: 30px;">
+          <h1 style="color: #2D5016; font-size: 28px; margin-bottom: 10px; font-weight: bold;">${meal.title}</h1>
+          <p style="color: #666; font-size: 14px; margin: 5px 0;">by ${meal.user?.username || 'Unknown'}</p>
+          <p style="color: #888; font-size: 12px;">Generated from Forkcast • ${new Date().toLocaleDateString()}</p>
+        </div>
+        
+        ${allImages.length > 0 ? `
+          <div style="text-align: center; margin-bottom: 30px;">
+            <img src="${allImages[0]}" style="max-width: 100%; height: 200px; object-fit: cover; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);" />
+          </div>
+        ` : ''}
+        
+        <div style="margin-bottom: 25px;">
+          <h2 style="color: #2D5016; font-size: 18px; margin-bottom: 15px; border-bottom: 2px solid #2D5016; padding-bottom: 5px;">🥘 Ingredients</h2>
+          <ul style="list-style: none; padding: 0; margin: 0;">
+            ${formatIngredients(meal.ingredients).map(ingredient => 
+              `<li style="margin-bottom: 8px; padding-left: 20px; position: relative;">
+                <span style="position: absolute; left: 0; color: #2D5016; font-weight: bold;">•</span>
+                ${ingredient}
+              </li>`
+            ).join('')}
+          </ul>
+        </div>
+        
+        <div style="margin-bottom: 25px;">
+          <h2 style="color: #2D5016; font-size: 18px; margin-bottom: 15px; border-bottom: 2px solid #2D5016; padding-bottom: 5px;">👨‍🍳 Instructions</h2>
+          <ol style="padding-left: 20px; margin: 0;">
+            ${formatInstructions(meal.instructions).map((instruction, index) => 
+              `<li style="margin-bottom: 12px; line-height: 1.6;">
+                <strong style="color: #2D5016;">Step ${index + 1}:</strong> ${instruction}
+              </li>`
+            ).join('')}
+          </ol>
+        </div>
+        
+        <div style="text-align: center; margin-top: 40px; padding-top: 20px; border-top: 1px solid #eee; color: #888; font-size: 12px;">
+          <p>🍴 Happy cooking! Visit Forkcast for more delicious recipes.</p>
+        </div>
+      `;
+      
+      document.body.appendChild(tempDiv);
+      
+      // Convert to canvas
+      const canvas = await html2canvas(tempDiv, {
+        scale: 2,
+        useCORS: true,
+        allowTaint: true,
+        backgroundColor: 'white',
+        width: 800,
+        windowWidth: 800
+      });
+      
+      // Clean up
+      document.body.removeChild(tempDiv);
+      
+      // Create PDF
+      const pdf = new jsPDF('p', 'mm', 'a4');
+      const imgWidth = 210; // A4 width in mm
+      const pageHeight = 297; // A4 height in mm
+      const imgHeight = (canvas.height * imgWidth) / canvas.width;
+      
+      // Add the canvas as image to PDF
+      pdf.addImage(canvas.toDataURL('image/png'), 'PNG', 0, 0, imgWidth, imgHeight);
+      
+      // Download the PDF
+      const fileName = `${meal.title.replace(/[^a-zA-Z0-9]/g, '_')}_recipe.pdf`;
+      pdf.save(fileName);
+      
+    } catch (error) {
+      console.error('Error generating PDF:', error);
+      alert('Failed to generate PDF. Please try again.');
+    } finally {
+      setIsDownloading(false);
+    }
+  };
+
   return (
     <Card className="overflow-hidden hover:shadow-lg transition-shadow">
       {/* Image Section with Gallery Navigation */}
