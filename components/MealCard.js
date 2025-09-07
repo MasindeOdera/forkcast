@@ -13,6 +13,8 @@ import { formatDistanceToNow } from 'date-fns';
 export default function MealCard({ meal, currentUserId, onEdit, onDelete, onAddToMealPlan }) {
   const [showDetails, setShowDetails] = useState(false);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  const [isDownloading, setIsDownloading] = useState(false);
+  const contentRef = useRef(null);
   const isOwner = meal.userId === currentUserId;
 
   // Combine main image and gallery images
