@@ -262,7 +262,7 @@ export default function MealCard({ meal, currentUserId, onEdit, onDelete, onAddT
       
       pdf.setFontSize(10);
       pdf.setTextColor(150, 150, 150);
-      pdf.text('🍴 Happy cooking! Visit Forkcast for more delicious recipes.', margin, currentY);
+      pdf.text('Happy cooking! Visit Forkcast for more delicious recipes.', margin, currentY);
       
       // Add page numbers if multiple pages
       if (currentPage > 1) {
