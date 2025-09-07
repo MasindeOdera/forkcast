@@ -299,6 +299,15 @@ class ForkcastAPITester:
             return False
             
         try:
+            # First, verify the meal exists by trying to get it
+            verify_url = f"{self.base_url}/meals/{self.test_meal_id}"
+            verify_response = self.session.get(verify_url)
+            print(f"DEBUG: Verification GET response: {verify_response.status_code}")
+            if verify_response.status_code == 200:
+                print(f"DEBUG: Meal exists, proceeding with update")
+            else:
+                print(f"DEBUG: Meal verification failed: {verify_response.text}")
+            
             url = f"{self.base_url}/meals/{self.test_meal_id}"
             print(f"DEBUG: Updating meal with ID: {self.test_meal_id}")
             payload = {
