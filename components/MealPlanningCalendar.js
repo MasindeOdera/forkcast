@@ -503,7 +503,20 @@ export default function MealPlanningCalendar() {
                   <div>
                     <h4 className="font-medium mb-2 text-sm">Community Meals</h4>
                     <div className="space-y-2">
-                      {allMeals.filter(meal => meal.userId !== JSON.parse(localStorage.getItem('forkcast_user') || '{}').id).map((meal) => (
+                      {allMeals.filter(meal => {
+                        const currentUserId = JSON.parse(localStorage.getItem('forkcast_user') || '{}').id;
+                        // Filter out meals by current user
+                        if (meal.userId === currentUserId) return false;
+                        
+                        // Filter out meals that the user has already copied (check if user has a meal with "(from username)" in title)
+                        const hasCopiedMeal = userMeals.some(userMeal => 
+                          userMeal.title.includes(`(from ${meal.user?.username})`) && 
+                          userMeal.ingredients === meal.ingredients &&
+                          userMeal.instructions === meal.instructions
+                        );
+                        
+                        return !hasCopiedMeal;
+                      }).map((meal) => (
                         <Card 
                           key={meal.id} 
                           className="cursor-pointer hover:shadow-md transition-shadow"
