@@ -229,6 +229,7 @@ class ForkcastAPITester:
                 required_fields = ['id', 'userId', 'title', 'ingredients', 'instructions', 'createdAt', 'updatedAt']
                 if all(field in data for field in required_fields):
                     self.test_meal_id = data['id']
+                    print(f"DEBUG: Created meal with ID: {self.test_meal_id}")
                     self.log_result('meals_create', 'pass', f'Meal created successfully: {data["title"]}')
                     return True
                 else:
