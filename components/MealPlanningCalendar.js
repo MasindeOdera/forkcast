@@ -110,23 +110,89 @@ export default function MealPlanningCalendar() {
     return mealPlan[`${dateKey}-${mealType}`];
   };
 
-  const addMealToSlot = (date, mealType, meal) => {
+  const addMealToSlot = async (date, mealType, meal) => {
     const dateKey = format(date, 'yyyy-MM-dd');
+    
+    // Update local state immediately for responsiveness
     setMealPlan(prev => ({
       ...prev,
       [`${dateKey}-${mealType}`]: meal
     }));
+    
+    // Save to backend
+    try {
+      const token = localStorage.getItem('forkcast_token');
+      const response = await fetch('/api/meal-plans', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          date: dateKey,
+          mealType,
+          mealId: meal.id
+        })
+      });
+      
+      if (!response.ok) {
+        // Revert local state if backend fails
+        setMealPlan(prev => {
+          const newPlan = { ...prev };
+          delete newPlan[`${dateKey}-${mealType}`];
+          return newPlan;
+        });
+        throw new Error('Failed to save meal plan');
+      }
+    } catch (error) {
+      console.error('Error saving meal plan:', error);
+      // Could show a toast notification here
+    }
+    
     setShowMealSelector(false);
     setSelectedSlot(null);
   };
 
-  const removeMealFromSlot = (date, mealType) => {
+  const removeMealFromSlot = async (date, mealType) => {
     const dateKey = format(date, 'yyyy-MM-dd');
+    const originalMeal = mealPlan[`${dateKey}-${mealType}`];
+    
+    // Update local state immediately
     setMealPlan(prev => {
       const newPlan = { ...prev };
       delete newPlan[`${dateKey}-${mealType}`];
       return newPlan;
     });
+    
+    // Remove from backend
+    try {
+      const token = localStorage.getItem('forkcast_token');
+      const response = await fetch('/api/meal-plans', {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          date: dateKey,
+          mealType
+        })
+      });
+      
+      if (!response.ok) {
+        // Revert local state if backend fails
+        if (originalMeal) {
+          setMealPlan(prev => ({
+            ...prev,
+            [`${dateKey}-${mealType}`]: originalMeal
+          }));
+        }
+        throw new Error('Failed to remove meal plan');
+      }
+    } catch (error) {
+      console.error('Error removing meal plan:', error);
+      // Could show a toast notification here
+    }
   };
 
   const openMealSelector = (date, mealType) => {
