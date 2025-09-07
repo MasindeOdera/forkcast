@@ -290,17 +290,17 @@ class ForkcastDataCleanup:
             self.log_message("⚠️ No meals found or unable to fetch meals")
             return False
         
-        test_user_ids = self.identify_test_users_from_meals(all_meals)
+        test_users = self.identify_test_users_from_meals(all_meals)
         
-        if not test_user_ids:
+        if not test_users:
             self.log_message("✅ No test users identified - system appears clean")
             return True
         
         # Step 3: Clean up test user data
-        self.log_message(f"🧹 Starting cleanup of {len(test_user_ids)} test users...")
+        self.log_message(f"🧹 Starting cleanup of {len(test_users)} test users...")
         
-        for user_id in test_user_ids:
-            self.cleanup_user_data(user_id)
+        for user_id, username in test_users.items():
+            self.cleanup_user_data(user_id, username)
         
         # Step 4: Verify cleanup
         remaining_test_meals = self.verify_cleanup()
