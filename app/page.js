@@ -180,30 +180,34 @@ export default function App() {
     setShowMealForm(true);
   };
 
-  const handleDeleteMeal = async (meal) => {
-    if (!confirm('Are you sure you want to delete this meal?')) {
-      return;
-    }
-
+  const handleAddToMealPlan = async (meal) => {
     try {
       const token = localStorage.getItem('forkcast_token');
-      const response = await fetch(`/api/meals/${meal.id}`, {
-        method: 'DELETE',
+      const response = await fetch('/api/meals', {
+        method: 'POST',
         headers: {
+          'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
-        }
+        },
+        body: JSON.stringify({
+          title: `${meal.title} (from ${meal.user?.username})`,
+          ingredients: meal.ingredients,
+          instructions: meal.instructions,
+          imageUrl: meal.imageUrl,
+          galleryImages: meal.galleryImages || []
+        })
       });
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to delete meal');
+      if (response.ok) {
+        toast.success(`"${meal.title}" copied to your collection! 🎉`);
+        // Refresh meals
+        await loadMeals();
+      } else {
+        throw new Error('Failed to copy meal');
       }
-
-      toast.success('Meal deleted successfully');
-      await loadMeals();
     } catch (error) {
-      console.error('Error deleting meal:', error);
-      toast.error(error.message);
+      console.error('Error copying meal:', error);
+      toast.error('Failed to copy meal. Please try again.');
     }
   };
 
