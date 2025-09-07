@@ -140,7 +140,7 @@ export default function MealSuggestionForm({ onSuggestionsReceived }) {
                   <SelectValue placeholder="Any" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Any</SelectItem>
+                  <SelectItem value="any">Any</SelectItem>
                   <SelectItem value="italian">Italian</SelectItem>
                   <SelectItem value="mexican">Mexican</SelectItem>
                   <SelectItem value="indian">Indian</SelectItem>
