@@ -353,16 +353,27 @@ export default function MealPlanningCalendar() {
               
               return (
                 <Card key={mealType} className="h-32 relative group cursor-pointer hover:shadow-md transition-shadow">
-                  <CardContent className="p-3 h-full">
+                  <CardContent 
+                    className="p-3 h-full"
+                    onDragOver={handleDragOver}
+                    onDrop={(e) => handleDrop(e, date, mealType)}
+                  >
                     {plannedMeal ? (
                       <div className="h-full flex flex-col">
                         <div className="flex-1">
                           <h4 className="text-xs font-medium line-clamp-2 mb-1">
                             {plannedMeal.title}
                           </h4>
-                          <Badge className={`text-xs ${getMealTypeColor(mealType)}`}>
-                            {MEAL_TYPES.find(t => t.value === mealType)?.label}
-                          </Badge>
+                          <div className="flex items-center gap-1 mb-1">
+                            <Badge className={`text-xs ${getMealTypeColor(mealType)}`}>
+                              {MEAL_TYPES.find(t => t.value === mealType)?.label}
+                            </Badge>
+                            {plannedMeal.isOwn === false && (
+                              <Badge variant="outline" className="text-xs bg-blue-50 text-blue-700 border-blue-200">
+                                by {plannedMeal.user?.username}
+                              </Badge>
+                            )}
+                          </div>
                         </div>
                         <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                           <Button
@@ -373,14 +384,16 @@ export default function MealPlanningCalendar() {
                           >
                             Change
                           </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="h-6 px-2 text-xs"
-                            onClick={() => removeMealFromSlot(date, mealType)}
-                          >
-                            Remove
-                          </Button>
+                          {plannedMeal.isOwn !== false && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="h-6 px-2 text-xs"
+                              onClick={() => removeMealFromSlot(date, mealType)}
+                            >
+                              Remove
+                            </Button>
+                          )}
                         </div>
                       </div>
                     ) : (
