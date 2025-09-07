@@ -174,14 +174,28 @@ export default function AuthForm({ onAuthSuccess }) {
                     <Input
                       id="register-password"
                       name="password"
-                      type="password"
+                      type={showPassword ? "text" : "password"}
                       placeholder="Create a password (min 6 characters)"
                       value={formData.password}
                       onChange={handleInputChange}
-                      className="pl-10"
+                      className="pl-10 pr-10"
                       minLength={6}
                       required
                     />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                      onClick={() => setShowPassword(!showPassword)}
+                      aria-label={showPassword ? "Hide password" : "Show password"}
+                    >
+                      {showPassword ? (
+                        <EyeOff className="h-4 w-4 text-muted-foreground" />
+                      ) : (
+                        <Eye className="h-4 w-4 text-muted-foreground" />
+                      )}
+                    </Button>
                   </div>
                 </div>
               </CardContent>
