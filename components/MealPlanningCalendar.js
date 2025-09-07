@@ -312,6 +312,16 @@ export default function MealPlanningCalendar() {
               <Button variant="outline" onClick={() => navigateWeek(1)}>
                 Next Week
               </Button>
+              <Button 
+                variant={showCommunityPlans ? "default" : "outline"}
+                onClick={() => {
+                  setShowCommunityPlans(!showCommunityPlans);
+                  // Reload meal plans when toggling
+                  setTimeout(() => loadMealPlan(), 100);
+                }}
+              >
+                {showCommunityPlans ? 'Hide Community' : 'Show Community'}
+              </Button>
               <Button onClick={generateWeeklyAISuggestions} className="flex items-center gap-2">
                 <Sparkles className="h-4 w-4" />
                 AI Weekly Plan
