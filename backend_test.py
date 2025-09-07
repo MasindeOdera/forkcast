@@ -541,26 +541,323 @@ class ForkcastAPITester:
         return failed == 0 and passed > 0
 
 def main():
-    """Main test execution"""
-    tester = ForkcastAPITester()
+    """Main investigation execution"""
+    investigator = MealPlansInvestigator()
     
     try:
-        tester.run_all_tests()
-        success = tester.print_summary()
-        
-        if success:
-            print("🎉 All tests passed successfully!")
-            return 0
-        else:
-            print("⚠️  Some tests failed. Check the details above.")
-            return 1
+        investigator.run_investigation()
+        return 0
             
     except KeyboardInterrupt:
-        print("\n\nTests interrupted by user.")
+        print("\n\nInvestigation interrupted by user.")
         return 1
     except Exception as e:
-        print(f"\n\nUnexpected error during testing: {e}")
+        print(f"\n\nUnexpected error during investigation: {e}")
         return 1
+
+class MealPlansInvestigator:
+    def __init__(self):
+        self.base_url = BASE_URL
+        self.session = requests.Session()
+        self.auth_token = None
+        self.user_data = None
+        self.test_meal_id = None
+        
+    def log_message(self, level, message):
+        """Log investigation message"""
+        symbols = {'INFO': 'ℹ️', 'SUCCESS': '✅', 'WARNING': '⚠️', 'ERROR': '❌', 'CRITICAL': '🚨'}
+        print(f"{symbols.get(level, '📋')} {message}")
+
+    def authenticate_user(self):
+        """Register and authenticate test user"""
+        self.log_message('INFO', 'Authenticating test user for investigation...')
+        
+        try:
+            # Try to register
+            url = f"{self.base_url}/auth/register"
+            payload = {
+                "username": TEST_USERNAME,
+                "password": TEST_PASSWORD
+            }
+            
+            response = self.session.post(url, json=payload)
+            
+            if response.status_code == 200:
+                data = response.json()
+                self.auth_token = data['token']
+                self.user_data = data['user']
+                self.session.headers.update({'Authorization': f'Bearer {self.auth_token}'})
+                self.log_message('SUCCESS', f'Test user registered: {self.user_data["username"]}')
+                return True
+            elif response.status_code == 400 and "already exists" in response.text:
+                # Try to login instead
+                return self.login_user()
+            else:
+                self.log_message('ERROR', f'Registration failed: {response.status_code} - {response.text}')
+                return False
+                
+        except Exception as e:
+            self.log_message('ERROR', f'Authentication exception: {str(e)}')
+            return False
+    
+    def login_user(self):
+        """Login existing test user"""
+        try:
+            url = f"{self.base_url}/auth/login"
+            payload = {
+                "username": TEST_USERNAME,
+                "password": TEST_PASSWORD
+            }
+            
+            response = self.session.post(url, json=payload)
+            
+            if response.status_code == 200:
+                data = response.json()
+                self.auth_token = data['token']
+                self.user_data = data['user']
+                self.session.headers.update({'Authorization': f'Bearer {self.auth_token}'})
+                self.log_message('SUCCESS', f'Test user logged in: {self.user_data["username"]}')
+                return True
+            else:
+                self.log_message('ERROR', f'Login failed: {response.status_code} - {response.text}')
+                return False
+                
+        except Exception as e:
+            self.log_message('ERROR', f'Login exception: {str(e)}')
+            return False
+
+    def investigate_meal_plans(self):
+        """Check current state of meal plans"""
+        self.log_message('INFO', 'Investigating current meal plans...')
+        
+        try:
+            url = f"{self.base_url}/meal-plans"
+            response = self.session.get(url)
+            
+            if response.status_code == 200:
+                meal_plans = response.json()
+                self.log_message('SUCCESS', f'GET /api/meal-plans successful')
+                
+                if len(meal_plans) == 0:
+                    self.log_message('CRITICAL', 'CONFIRMED: NO MEAL PLANS FOUND - User report verified!')
+                    self.log_message('CRITICAL', 'This confirms the cleanup process was too aggressive')
+                else:
+                    self.log_message('INFO', f'Found {len(meal_plans)} meal plans')
+                    # Show sample meal plans
+                    for i, plan in enumerate(meal_plans[:3]):
+                        self.log_message('INFO', f'  Plan {i+1}: User={plan.get("userId", "N/A")}, Date={plan.get("date", "N/A")}, Type={plan.get("mealType", "N/A")}')
+                    if len(meal_plans) > 3:
+                        self.log_message('INFO', f'  ... and {len(meal_plans) - 3} more meal plans')
+                
+                return meal_plans
+            else:
+                self.log_message('ERROR', f'Failed to get meal plans: {response.status_code} - {response.text}')
+                return None
+                
+        except Exception as e:
+            self.log_message('ERROR', f'Meal plans investigation exception: {str(e)}')
+            return None
+
+    def investigate_meals(self):
+        """Check current state of meals"""
+        self.log_message('INFO', 'Investigating current meals...')
+        
+        try:
+            url = f"{self.base_url}/meals"
+            response = self.session.get(url)
+            
+            if response.status_code == 200:
+                meals = response.json()
+                self.log_message('SUCCESS', f'GET /api/meals successful')
+                
+                if len(meals) == 0:
+                    self.log_message('CRITICAL', 'CONFIRMED: NO MEALS FOUND - Complete data wipe detected!')
+                    self.log_message('CRITICAL', 'All meal data has been deleted, not just meal plans')
+                else:
+                    self.log_message('INFO', f'Found {len(meals)} meals')
+                    # Show sample meals
+                    for i, meal in enumerate(meals[:3]):
+                        self.log_message('INFO', f'  Meal {i+1}: Title="{meal.get("title", "N/A")}", User={meal.get("userId", "N/A")}')
+                    if len(meals) > 3:
+                        self.log_message('INFO', f'  ... and {len(meals) - 3} more meals')
+                
+                return meals
+            else:
+                self.log_message('ERROR', f'Failed to get meals: {response.status_code} - {response.text}')
+                return None
+                
+        except Exception as e:
+            self.log_message('ERROR', f'Meals investigation exception: {str(e)}')
+            return None
+
+    def test_meal_plan_functionality(self):
+        """Test if meal plan creation/deletion still works"""
+        self.log_message('INFO', 'Testing meal plan functionality...')
+        
+        try:
+            # First create a test meal
+            self.log_message('INFO', 'Creating test meal for meal plan...')
+            meal_url = f"{self.base_url}/meals"
+            meal_data = {
+                'title': 'Recovery Test Meal',
+                'ingredients': 'Test ingredients for recovery assessment',
+                'instructions': 'Test instructions for recovery meal'
+            }
+            
+            meal_response = self.session.post(meal_url, json=meal_data)
+            
+            if meal_response.status_code != 200:
+                self.log_message('ERROR', f'Failed to create test meal: {meal_response.status_code} - {meal_response.text}')
+                return False
+            
+            meal = meal_response.json()
+            self.test_meal_id = meal['id']
+            self.log_message('SUCCESS', f'Test meal created: {meal["title"]}')
+            
+            # Now test meal plan creation
+            self.log_message('INFO', 'Testing meal plan creation...')
+            today = datetime.now().strftime('%Y-%m-%d')
+            
+            plan_data = {
+                'date': today,
+                'mealType': 'lunch',
+                'mealId': self.test_meal_id
+            }
+            
+            plan_url = f"{self.base_url}/meal-plans"
+            plan_response = self.session.post(plan_url, json=plan_data)
+            
+            if plan_response.status_code == 200:
+                self.log_message('SUCCESS', 'Meal plan creation successful - functionality is working!')
+                
+                # Verify the meal plan exists
+                verify_response = self.session.get(plan_url)
+                if verify_response.status_code == 200:
+                    plans = verify_response.json()
+                    new_plans = [p for p in plans if p.get('mealId') == self.test_meal_id]
+                    if new_plans:
+                        self.log_message('SUCCESS', 'Meal plan verified in database')
+                        
+                        # Test meal plan deletion
+                        self.log_message('INFO', 'Testing meal plan deletion...')
+                        delete_data = {
+                            'date': today,
+                            'mealType': 'lunch'
+                        }
+                        
+                        delete_response = self.session.delete(plan_url, json=delete_data)
+                        if delete_response.status_code == 200:
+                            self.log_message('SUCCESS', 'Meal plan deletion successful')
+                        else:
+                            self.log_message('WARNING', f'Meal plan deletion failed: {delete_response.status_code}')
+                    else:
+                        self.log_message('WARNING', 'Meal plan not found in verification check')
+                
+                return True
+            else:
+                self.log_message('ERROR', f'Failed to create meal plan: {plan_response.status_code} - {plan_response.text}')
+                return False
+                
+        except Exception as e:
+            self.log_message('ERROR', f'Functionality test exception: {str(e)}')
+            return False
+
+    def cleanup_test_data(self):
+        """Clean up test data created during investigation"""
+        self.log_message('INFO', 'Cleaning up test data...')
+        
+        if self.test_meal_id:
+            try:
+                url = f"{self.base_url}/meals/{self.test_meal_id}"
+                response = self.session.delete(url)
+                if response.status_code == 200:
+                    self.log_message('SUCCESS', 'Test meal cleaned up')
+                else:
+                    self.log_message('WARNING', f'Failed to clean up test meal: {response.status_code}')
+            except Exception as e:
+                self.log_message('WARNING', f'Cleanup exception: {str(e)}')
+
+    def run_investigation(self):
+        """Run comprehensive meal plans investigation"""
+        print("🚨 URGENT: MEAL PLANS DELETION INVESTIGATION")
+        print("=" * 70)
+        print("User reported ALL meal plans have been removed.")
+        print("Investigating scope of data loss and system functionality.")
+        print("=" * 70)
+        
+        # Step 1: Authenticate
+        if not self.authenticate_user():
+            self.log_message('CRITICAL', 'Cannot authenticate - investigation cannot proceed')
+            return
+        
+        # Step 2: Investigate current data state
+        meal_plans = self.investigate_meal_plans()
+        meals = self.investigate_meals()
+        
+        # Step 3: Test functionality
+        functionality_works = self.test_meal_plan_functionality()
+        
+        # Step 4: Analysis and recommendations
+        print("\n" + "=" * 70)
+        print("📊 INVESTIGATION RESULTS & DATA RECOVERY ASSESSMENT")
+        print("=" * 70)
+        
+        # Data Loss Assessment
+        meal_plans_lost = meal_plans is not None and len(meal_plans) == 0
+        meals_lost = meals is not None and len(meals) == 0
+        
+        if meal_plans_lost and meals_lost:
+            self.log_message('CRITICAL', 'COMPLETE DATA WIPE CONFIRMED')
+            self.log_message('CRITICAL', 'Both meal plans AND meals have been deleted')
+            self.log_message('CRITICAL', 'This indicates the cleanup process removed ALL user data')
+        elif meal_plans_lost:
+            self.log_message('CRITICAL', 'MEAL PLANS DATA LOSS CONFIRMED')
+            self.log_message('WARNING', f'Meals still exist ({len(meals)} found) but meal plans are gone')
+        elif meals_lost:
+            self.log_message('CRITICAL', 'MEALS DATA LOSS CONFIRMED')
+            self.log_message('WARNING', f'Meal plans exist ({len(meal_plans)} found) but meals are gone')
+        else:
+            if meal_plans and meals:
+                self.log_message('INFO', f'Data found: {len(meal_plans)} meal plans, {len(meals)} meals')
+                self.log_message('WARNING', 'User report may be incorrect or data was partially recovered')
+        
+        # Functionality Assessment
+        if functionality_works:
+            self.log_message('SUCCESS', 'SYSTEM FUNCTIONALITY INTACT')
+            self.log_message('SUCCESS', 'Meal plan creation/deletion APIs are working')
+            self.log_message('SUCCESS', 'New data can be created successfully')
+        else:
+            self.log_message('CRITICAL', 'SYSTEM FUNCTIONALITY COMPROMISED')
+            self.log_message('CRITICAL', 'Meal plan APIs are not working properly')
+        
+        # Recovery Assessment
+        print("\n🔍 DATA RECOVERY ASSESSMENT:")
+        if meal_plans_lost or meals_lost:
+            self.log_message('ERROR', 'Data recovery options limited:')
+            print("   • Check if database backups exist")
+            print("   • Review cleanup script logs for recovery clues")
+            print("   • Investigate if soft-delete was used (data may be recoverable)")
+            print("   • Check if any data exists in related tables")
+        else:
+            self.log_message('INFO', 'No data recovery needed - data appears intact')
+        
+        # Immediate Actions
+        print("\n📋 IMMEDIATE ACTION ITEMS:")
+        print("1. 🛑 STOP all cleanup operations immediately")
+        print("2. 🔍 Review cleanup scripts that were executed")
+        print("3. 💾 Check database backups for potential recovery")
+        print("4. 🔒 Implement data protection safeguards")
+        print("5. 📊 Audit remaining data integrity")
+        
+        if not functionality_works:
+            print("6. 🚨 URGENT: Fix meal plan API functionality")
+        
+        # Cleanup
+        self.cleanup_test_data()
+        
+        print("\n" + "=" * 70)
+        print("Investigation completed. Report findings to main agent.")
+        print("=" * 70)
 
 if __name__ == "__main__":
     exit(main())
