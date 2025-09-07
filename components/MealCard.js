@@ -159,93 +159,108 @@ export default function MealCard({ meal, currentUserId, onEdit, onDelete, onAddT
       </CardContent>
       
       <CardFooter>
-        <Dialog open={showDetails} onOpenChange={setShowDetails}>
-          <DialogTrigger asChild>
-            <Button variant="outline" className="w-full">
-              <Eye className="mr-2 h-4 w-4" />
-              View Recipe
-            </Button>
-          </DialogTrigger>
-          
-          <DialogContent className="max-w-2xl max-h-[80vh]">
-            <DialogHeader>
-              <DialogTitle className="text-xl">{meal.title}</DialogTitle>
-              <div className="flex items-center gap-2 text-muted-foreground">
-                <User className="h-4 w-4" />
-                <span>by {meal.user?.username}</span>
-                <span>•</span>
-                <Clock className="h-4 w-4" />
-                <span>{formatDistanceToNow(new Date(meal.createdAt), { addSuffix: true })}</span>
-              </div>
-            </DialogHeader>
+        <div className="flex gap-2 w-full">
+          <Dialog open={showDetails} onOpenChange={setShowDetails}>
+            <DialogTrigger asChild>
+              <Button variant="outline" className="flex-1">
+                <Eye className="mr-2 h-4 w-4" />
+                View Recipe
+              </Button>
+            </DialogTrigger>
             
-            <ScrollArea className="max-h-[60vh]">
-              <div className="space-y-6">
-                {/* Gallery Section in Dialog */}
-                {allImages.length > 0 && (
-                  <div className="space-y-4">
-                    <img
-                      src={allImages[currentImageIndex]}
-                      alt={meal.title}
-                      className="w-full h-64 object-cover rounded-lg"
-                    />
-                    
-                    {/* Thumbnail Navigation */}
-                    {allImages.length > 1 && (
-                      <div className="flex gap-2 overflow-x-auto pb-2">
-                        {allImages.map((image, index) => (
-                          <img
-                            key={index}
-                            src={image}
-                            alt={`${meal.title} ${index + 1}`}
-                            className={`w-16 h-16 object-cover rounded cursor-pointer flex-shrink-0 border-2 transition-all ${
-                              index === currentImageIndex 
-                                ? 'border-primary ring-2 ring-primary/20' 
-                                : 'border-transparent hover:border-muted-foreground'
-                            }`}
-                            onClick={() => setCurrentImageIndex(index)}
-                          />
-                        ))}
-                      </div>
-                    )}
+            <DialogContent className="max-w-2xl max-h-[80vh]">
+              <DialogHeader>
+                <DialogTitle className="text-xl">{meal.title}</DialogTitle>
+                <div className="flex items-center gap-2 text-muted-foreground">
+                  <User className="h-4 w-4" />
+                  <span>by {meal.user?.username}</span>
+                  <span>•</span>
+                  <Clock className="h-4 w-4" />
+                  <span>{formatDistanceToNow(new Date(meal.createdAt), { addSuffix: true })}</span>
+                </div>
+              </DialogHeader>
+              
+              <ScrollArea className="max-h-[60vh]">
+                <div className="space-y-6">
+                  {/* Gallery Section in Dialog */}
+                  {allImages.length > 0 && (
+                    <div className="space-y-4">
+                      <img
+                        src={allImages[currentImageIndex]}
+                        alt={meal.title}
+                        className="w-full h-64 object-cover rounded-lg"
+                      />
+                      
+                      {/* Thumbnail Navigation */}
+                      {allImages.length > 1 && (
+                        <div className="flex gap-2 overflow-x-auto pb-2">
+                          {allImages.map((image, index) => (
+                            <img
+                              key={index}
+                              src={image}
+                              alt={`${meal.title} ${index + 1}`}
+                              className={`w-16 h-16 object-cover rounded cursor-pointer flex-shrink-0 border-2 transition-all ${
+                                index === currentImageIndex 
+                                  ? 'border-primary ring-2 ring-primary/20' 
+                                  : 'border-transparent hover:border-muted-foreground'
+                              }`}
+                              onClick={() => setCurrentImageIndex(index)}
+                            />
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                  
+                  <div>
+                    <h3 className="font-semibold mb-3 flex items-center gap-2">
+                      <ChefHat className="h-5 w-5" />
+                      Ingredients
+                    </h3>
+                    <ul className="space-y-1">
+                      {formatIngredients(meal.ingredients).map((ingredient, index) => (
+                        <li key={index} className="flex items-start gap-2">
+                          <span className="text-primary">•</span>
+                          <span className="text-sm">{ingredient}</span>
+                        </li>
+                      ))}
+                    </ul>
                   </div>
-                )}
-                
-                <div>
-                  <h3 className="font-semibold mb-3 flex items-center gap-2">
-                    <ChefHat className="h-5 w-5" />
-                    Ingredients
-                  </h3>
-                  <ul className="space-y-1">
-                    {formatIngredients(meal.ingredients).map((ingredient, index) => (
-                      <li key={index} className="flex items-start gap-2">
-                        <span className="text-primary">•</span>
-                        <span className="text-sm">{ingredient}</span>
-                      </li>
-                    ))}
-                  </ul>
+                  
+                  <div>
+                    <h3 className="font-semibold mb-3 flex items-center gap-2">
+                      <Clock className="h-5 w-5" />
+                      Instructions
+                    </h3>
+                    <ol className="space-y-2">
+                      {formatInstructions(meal.instructions).map((instruction, index) => (
+                        <li key={index} className="flex gap-3">
+                          <Badge variant="outline" className="min-w-[1.5rem] h-6 text-xs">
+                            {index + 1}
+                          </Badge>
+                          <span className="text-sm flex-1">{instruction}</span>
+                        </li>
+                      ))}
+                    </ol>
+                  </div>
                 </div>
-                
-                <div>
-                  <h3 className="font-semibold mb-3 flex items-center gap-2">
-                    <Clock className="h-5 w-5" />
-                    Instructions
-                  </h3>
-                  <ol className="space-y-2">
-                    {formatInstructions(meal.instructions).map((instruction, index) => (
-                      <li key={index} className="flex gap-3">
-                        <Badge variant="outline" className="min-w-[1.5rem] h-6 text-xs">
-                          {index + 1}
-                        </Badge>
-                        <span className="text-sm flex-1">{instruction}</span>
-                      </li>
-                    ))}
-                  </ol>
-                </div>
-              </div>
-            </ScrollArea>
-          </DialogContent>
-        </Dialog>
+              </ScrollArea>
+            </DialogContent>
+          </Dialog>
+          
+          {/* Add to Meal Plan button for non-owner meals */}
+          {!isOwner && onAddToMealPlan && (
+            <Button 
+              variant="default" 
+              size="sm"
+              onClick={() => onAddToMealPlan(meal)}
+              className="flex-shrink-0"
+            >
+              <Plus className="mr-1 h-3 w-3" />
+              Add to Plan
+            </Button>
+          )}
+        </div>
       </CardFooter>
     </Card>
   );
