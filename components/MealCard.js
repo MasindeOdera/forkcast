@@ -144,7 +144,7 @@ export default function MealCard({ meal, currentUserId, onEdit, onDelete, onAddT
   };
 
   return (
-    <Card className="overflow-hidden hover:shadow-lg transition-shadow">
+    <Card className="overflow-hidden hover:shadow-lg transition-shadow card-hover">
       {/* Image Section with Gallery Navigation */}
       <div className="aspect-video relative overflow-hidden group">
         {allImages.length > 0 ? (
