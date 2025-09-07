@@ -530,12 +530,16 @@ export default function MealPlanningCalendar() {
                         >
                           <CardContent className="p-4">
                             <div className="flex items-center gap-3">
-                              {meal.imageUrl && (
+                              {meal.imageUrl ? (
                                 <img 
                                   src={meal.imageUrl} 
                                   alt={meal.title}
                                   className="w-12 h-12 object-cover rounded"
                                 />
+                              ) : (
+                                <div className="w-12 h-12 bg-gradient-to-br from-gray-100 to-gray-200 rounded flex items-center justify-center">
+                                  <ChefHat className="h-6 w-6 text-gray-400" />
+                                </div>
                               )}
                               <div className="flex-1">
                                 <h4 className="font-medium">{meal.title}</h4>
