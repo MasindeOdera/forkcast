@@ -102,7 +102,7 @@
 # Testing Data - Main Agent and testing sub agent both should log testing data below this section
 #====================================================================================================
 
-user_problem_statement: "Test the Forkcast app backend API endpoints including Authentication APIs (register/login), Meal APIs (CRUD operations), Image Upload API, and User API. The app was showing a JSON parsing error during registration."
+user_problem_statement: "Test the Forkcast app functionality, implement password visibility toggle, fix drag and drop in AI Ideas section, solve duplicate meal issue in Discover section, and reposition buttons in meal cards. User reported drag and drop not working in AI Ideas section and wants duplicate meals in Discover to be replaced rather than shown twice."
 
 backend:
   - task: "Authentication - User Registration"
