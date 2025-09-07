@@ -44,11 +44,6 @@ Forkcast is a modern meal planning app built with Next.js 15, Supabase (PostgreS
 
 ## 🚀 Quick Start
 
-### Prerequisites
-- Node.js 18+ installed
-- MongoDB running locally or a MongoDB Atlas account
-- Cloudinary account (free tier available)
-
 ### Environment Setup
 
 1. **Clone and install dependencies:**
@@ -60,9 +55,9 @@ yarn install
 2. **Environment Variables:**
 Create or verify your `.env` file contains:
 ```env
-# Database
-MONGO_URL=mongodb://localhost:27017
-DB_NAME=forkcast
+# Database (Supabase PostgreSQL)
+NEXT_PUBLIC_SUPABASE_URL=your_supabase_project_url
+SUPABASE_SERVICE_ROLE_KEY=your_supabase_service_role_key
 
 # Application
 NEXT_PUBLIC_BASE_URL=https://forkcast-planner.preview.emergentagent.com
@@ -76,6 +71,47 @@ NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET=Forkcast
 
 # AI Features
 EMERGENT_LLM_KEY=sk-emergent-592094f3002F7B1005
+```
+
+3. **Database Setup (Supabase):**
+Execute the following SQL commands in your Supabase SQL editor:
+```sql
+-- Create users table
+CREATE TABLE IF NOT EXISTS users (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  username VARCHAR(50) UNIQUE NOT NULL,
+  password VARCHAR(255) NOT NULL,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Create meals table
+CREATE TABLE IF NOT EXISTS meals (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+  title VARCHAR(255) NOT NULL,
+  ingredients TEXT NOT NULL,
+  instructions TEXT NOT NULL,
+  image_url TEXT,
+  gallery_images JSONB,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Create meal_plans table for calendar functionality
+CREATE TABLE IF NOT EXISTS meal_plans (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+  meal_id UUID REFERENCES meals(id) ON DELETE CASCADE,
+  date DATE NOT NULL,
+  meal_type VARCHAR(20) NOT NULL CHECK (meal_type IN ('breakfast', 'lunch', 'dinner')),
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  UNIQUE(user_id, date, meal_type)
+);
+
+-- Create indexes for better performance
+CREATE INDEX IF NOT EXISTS idx_meals_user_id ON meals(user_id);
+CREATE INDEX IF NOT EXISTS idx_meals_created_at ON meals(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_meal_plans_user_date ON meal_plans(user_id, date);
 ```
 
 3. **Start the development server:**
