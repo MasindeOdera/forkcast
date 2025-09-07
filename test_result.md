@@ -300,7 +300,7 @@ metadata:
 
 test_plan:
   current_focus:
-    - "All frontend features comprehensively tested and working"
+    - "Test data cleanup completed successfully"
   stuck_tasks: []
   test_all: true
   test_priority: "completed"
