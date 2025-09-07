@@ -295,6 +295,7 @@ export async function POST(request, { params }) {
         ingredients: ingredients.trim(),
         instructions: instructions.trim(),
         imageUrl: imageUrl || null,
+        galleryImages: galleryImages || [],
         createdAt: new Date(),
         updatedAt: new Date(),
       };
