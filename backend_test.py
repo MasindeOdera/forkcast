@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-Forkcast Backend API Test Suite
-Tests all backend API endpoints for the Forkcast meal sharing application.
+URGENT: Forkcast Meal Plans Investigation
+Investigating reported meal plans deletion issue and data recovery assessment.
 """
 
 import requests
@@ -9,12 +9,12 @@ import json
 import os
 import time
 import uuid
-from datetime import datetime
+from datetime import datetime, timedelta
 
 # Configuration
 BASE_URL = "https://forkcast-planner.preview.emergentagent.com/api"
-TEST_USERNAME = f"chef_{int(time.time())}"
-TEST_PASSWORD = "delicious123"
+TEST_USERNAME = f"mealplan_recovery_{int(time.time())}"
+TEST_PASSWORD = "recovery123"
 
 class ForkcastAPITester:
     def __init__(self):
