@@ -24,10 +24,43 @@ export default function MealPlanningCalendar() {
   const [aiSuggestions, setAiSuggestions] = useState('');
   const [loadingMeals, setLoadingMeals] = useState(true);
 
-  // Load user's meals
+  // Load meal plan data from backend
   useEffect(() => {
-    loadUserMeals();
-  }, []);
+    loadMealPlan();
+  }, [currentWeek]);
+
+  const loadMealPlan = async () => {
+    try {
+      const token = localStorage.getItem('forkcast_token');
+      const startDate = format(currentWeek, 'yyyy-MM-dd');
+      const endDate = format(addDays(currentWeek, 6), 'yyyy-MM-dd');
+      
+      const response = await fetch(`/api/meal-plans?startDate=${startDate}&endDate=${endDate}`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      
+      if (response.ok) {
+        const plans = await response.json();
+        
+        // Convert array to object for easier lookup
+        const planObject = {};
+        plans.forEach(plan => {
+          const key = `${plan.date}-${plan.mealType}`;
+          planObject[key] = {
+            id: plan.meal.id,
+            title: plan.meal.title,
+            imageUrl: plan.meal.imageUrl,
+            ingredients: plan.meal.ingredients,
+            instructions: plan.meal.instructions
+          };
+        });
+        
+        setMealPlan(planObject);
+      }
+    } catch (error) {
+      console.error('Error loading meal plan:', error);
+    }
+  };
 
   const loadUserMeals = async () => {
     try {
