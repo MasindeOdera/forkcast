@@ -105,29 +105,31 @@ class ForkcastDataCleanup:
         """Identify test users from meal data"""
         self.log_message("Analyzing meals to identify test users...")
         
-        test_user_ids = set()
-        test_usernames = set()
+        test_users = {}  # user_id -> username mapping
         
         for meal in meals:
             # Check if meal has user information
             if 'user' in meal and 'username' in meal['user']:
                 username = meal['user']['username']
-                if self.is_test_user(username):
-                    test_user_ids.add(meal.get('userId'))
-                    test_usernames.add(username)
-                    self.log_message(f"🔍 Found test user meal: {username} (ID: {meal.get('userId')})")
+                user_id = meal.get('userId')
+                if self.is_test_user(username) and user_id:
+                    test_users[user_id] = username
+                    self.log_message(f"🔍 Found test user meal: {username} (ID: {user_id})")
             
             # Also check meal titles for test patterns
             title = meal.get('title', '')
             if any(pattern in title.lower() for pattern in ['test', 'debug', 'sample', 'demo']):
-                self.log_message(f"🔍 Found test meal: '{title}' by user {meal.get('userId')}")
-                if meal.get('userId'):
-                    test_user_ids.add(meal.get('userId'))
+                user_id = meal.get('userId')
+                if user_id and user_id not in test_users:
+                    # Try to get username from meal data
+                    username = meal.get('user', {}).get('username', f'unknown_user_{user_id[:8]}')
+                    test_users[user_id] = username
+                    self.log_message(f"🔍 Found test meal: '{title}' by user {username} ({user_id})")
         
-        self.cleanup_results['test_users_found'] = len(test_user_ids)
-        self.log_message(f"📋 Identified {len(test_user_ids)} test users: {list(test_usernames)}")
+        self.cleanup_results['test_users_found'] = len(test_users)
+        self.log_message(f"📋 Identified {len(test_users)} test users: {list(test_users.values())}")
         
-        return list(test_user_ids)
+        return test_users
 
     def get_user_meals(self, user_id):
         """Get all meals for a specific user"""
