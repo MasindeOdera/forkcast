@@ -11,6 +11,7 @@ import { Loader2, User, Lock, Eye, EyeOff } from 'lucide-react';
 export default function AuthForm({ onAuthSuccess }) {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [formData, setFormData] = useState({
     username: '',
     password: ''
