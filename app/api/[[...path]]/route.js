@@ -486,10 +486,15 @@ export async function PUT(request, { params }) {
         updatedAt: new Date(),
       };
 
+      console.log(`DEBUG PUT: updateData=`, updateData);
+
       const result = await db.collection('meals').updateOne(
         { id: mealId, userId: user.userId },
         { $set: updateData }
       );
+
+      console.log(`DEBUG PUT: updateOne result=`, result);
+      console.log(`DEBUG PUT: matchedCount=${result.matchedCount}, modifiedCount=${result.modifiedCount}`);
 
       if (result.matchedCount === 0) {
         return withCors(NextResponse.json({ error: 'Meal not found' }, { status: 404 }));
