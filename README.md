@@ -130,28 +130,50 @@ Navigate to `http://localhost:3000`
 
 ### Getting Started
 1. **Register/Login**: Create a new account or login with existing credentials
+   - Use the password visibility toggle (eye icon) to show/hide your password
 2. **Explore**: Browse meals from other users in the "Discover" tab
+   - Meals you've copied from other users won't appear as duplicates
 3. **Create**: Add your own meals with photos, ingredients, and instructions
-4. **AI Suggestions**: Get personalized meal ideas in the "AI Ideas" tab
+   - Upload multiple images for a meal gallery
+   - Meals without photos show beautiful placeholder images
+4. **Plan**: Use the "AI Ideas" tab for intelligent meal planning
+   - Drag AI-generated meals directly to your weekly calendar
+5. **Schedule**: Organize meals using the Weekly Planner calendar
+   - Drag and drop meals to specific days and meal times
 
 ### Adding a Meal
-1. Click "Add Meal" button
+1. Click "Add Meal" button (+ icon in header or tabs)
 2. Fill in meal details:
    - **Title**: Give your meal a catchy name
-   - **Photo**: Upload a high-quality image (optional)
+   - **Photo**: Upload a high-quality image (optional - placeholder will show if none)
+   - **Gallery**: Add multiple images to create a photo gallery
    - **Ingredients**: List all ingredients, one per line
    - **Instructions**: Step-by-step cooking instructions
 3. Click "Create Meal" to save
+4. Meals appear in your "My Meals" tab and are available for planning
 
-### AI Meal Suggestions
-1. Go to the "AI Ideas" tab
-2. Describe what you're looking for
-3. Optionally specify:
-   - Available ingredients
-   - Dietary preferences
-   - Cuisine style
-   - Meal type
-4. Click "Get AI Meal Suggestions" for personalized ideas
+### Enhanced AI Meal Suggestions
+1. Go to the "AI Ideas" tab in the meal planning section
+2. Fill out the AI suggestion form:
+   - **Prompt**: Describe what you're looking for (required)
+   - **Ingredients**: List ingredients you have available
+   - **Dietary Preferences**: Select from vegetarian, vegan, keto, etc.
+   - **Cuisine Style**: Choose from Italian, Mexican, Indian, etc.
+   - **Meal Type**: Select breakfast, lunch, dinner, snack, etc.
+3. Click "Get AI Meal Suggestions" for personalized ideas
+4. **New Features**:
+   - AI suggestions appear as interactive, draggable meal cards
+   - Drag cards directly to calendar slots for instant meal planning
+   - Click "Add to My Recipes" to permanently save AI meals
+   - Switch seamlessly between AI Ideas and Weekly Planner tabs
+
+### Weekly Meal Planning
+1. Navigate to the meal planning section and select "Weekly Planner"
+2. **Drag & Drop**: Drag meals from the meal selector to calendar slots
+3. **Calendar Navigation**: Use Previous/Next Week buttons to plan ahead
+4. **Meal Types**: Schedule breakfast, lunch, and dinner for each day
+5. **Community Integration**: Toggle "Show Community" to see meals from other users
+6. **Persistence**: Your meal plans are automatically saved and persist across sessions
 
 ## 🏗️ Architecture
 
