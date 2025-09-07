@@ -627,7 +627,7 @@ export default function MealPlanningCalendar() {
                                     <ChefHat className="h-6 w-6 text-gray-400" />
                                   </div>
                                 );
-                              })()
+                              })()}
                               <div className="flex-1">
                                 <h4 className="font-medium">{meal.title}</h4>
                                 <p className="text-sm text-muted-foreground line-clamp-1">
