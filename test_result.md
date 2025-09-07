@@ -218,7 +218,7 @@ backend:
 
 frontend:
   - task: "Password Visibility Toggle"
-    implemented: false
+    implemented: true
     working: "NA"
     file: "components/AuthForm.js"
     stuck_count: 0
@@ -228,11 +228,14 @@ frontend:
         - working: "NA"
           agent: "main"
           comment: "User requested password visibility toggle in login/register forms. Need to add eye icon to show/hide password."
+        - working: "NA"
+          agent: "main"
+          comment: "Implemented password visibility toggle with Eye/EyeOff icons for both login and register forms. Added showPassword state and toggle functionality."
 
   - task: "Drag and Drop in AI Ideas Section"
     implemented: true
-    working: false
-    file: "components/MealPlanningCalendar.js"
+    working: "NA"
+    file: "components/MealSuggestions.js, components/MealPlanningCalendar.js"
     stuck_count: 1
     priority: "high"
     needs_retesting: true
@@ -240,10 +243,13 @@ frontend:
         - working: false
           agent: "user"
           comment: "User reported drag and drop functionality not working in AI Ideas section of the calendar. Feature exists but may not be working correctly."
+        - working: "NA"
+          agent: "main"
+          comment: "Enhanced MealSuggestions component to parse AI responses into draggable meal cards. Added drag handlers and updated MealPlanningCalendar to handle AI meal drops. Installed @dnd-kit libraries for proper drag-and-drop support."
 
   - task: "Duplicate Meal Issue in Discover Section"
     implemented: true
-    working: false
+    working: "NA"
     file: "components/MealPlanningCalendar.js"
     stuck_count: 1
     priority: "high"
@@ -252,10 +258,13 @@ frontend:
         - working: false
           agent: "user"
           comment: "User sees duplicate meals in Discover section. When a meal is added from another user, they want the newly added meal to replace the original for that user, keeping them as separate meal plans."
+        - working: "NA"
+          agent: "main"
+          comment: "Modified community meals filtering logic to hide meals that the user has already copied. Added check for meals with '(from username)' pattern and matching ingredients/instructions."
 
   - task: "Button Positioning in Meal Cards"
     implemented: true
-    working: false
+    working: "NA"
     file: "components/MealCard.js"
     stuck_count: 0
     priority: "low"
@@ -264,6 +273,9 @@ frontend:
         - working: false
           agent: "user"
           comment: "User wants 'Add to plan' button to appear underneath 'View recipe' button in meal cards instead of side by side."
+        - working: "NA"
+          agent: "main"
+          comment: "Changed MealCard layout from flex-row to flex-col so 'Add to plan' button appears below 'View recipe' button. Both buttons now span full width."
 
 metadata:
   created_by: "testing_agent"
