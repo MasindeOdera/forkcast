@@ -460,8 +460,8 @@ export default function App() {
               )}
             </TabsContent>
 
-            <TabsContent value="ai-suggestions" className="space-y-6">
-              <div className="flex items-center justify-center">
+            <TabsContent value="ai-suggestions" className="space-y-6 animate-fade-in-up">
+              <div className="fade-transition">
                 <MealSuggestions />
               </div>
             </TabsContent>
