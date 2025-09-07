@@ -19,10 +19,13 @@ export default function MealPlanningCalendar() {
   const [currentWeek, setCurrentWeek] = useState(() => startOfWeek(new Date()));
   const [mealPlan, setMealPlan] = useState({});
   const [userMeals, setUserMeals] = useState([]);
+  const [allMeals, setAllMeals] = useState([]);
   const [showMealSelector, setShowMealSelector] = useState(false);
   const [selectedSlot, setSelectedSlot] = useState(null);
   const [aiSuggestions, setAiSuggestions] = useState('');
   const [loadingMeals, setLoadingMeals] = useState(true);
+  const [showCommunityPlans, setShowCommunityPlans] = useState(false);
+  const [draggedMeal, setDraggedMeal] = useState(null);
 
   // Load user's meals and meal plan data
   useEffect(() => {
