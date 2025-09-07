@@ -50,51 +50,61 @@ export default function MealCard({ meal, currentUserId, onEdit, onDelete, onAddT
   return (
     <Card className="overflow-hidden hover:shadow-lg transition-shadow">
       {/* Image Section with Gallery Navigation */}
-      {allImages.length > 0 && (
-        <div className="aspect-video relative overflow-hidden group">
-          <img
-            src={allImages[currentImageIndex]}
-            alt={meal.title}
-            className="w-full h-full object-cover"
-          />
-          
-          {/* Image Navigation */}
-          {allImages.length > 1 && (
-            <>
-              <Button
-                variant="secondary"
-                size="sm"
-                className="absolute left-2 top-1/2 transform -translate-y-1/2 h-8 w-8 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
-                onClick={() => navigateImage('prev')}
-              >
-                <ChevronLeft className="h-4 w-4" />
-              </Button>
-              
-              <Button
-                variant="secondary"
-                size="sm"
-                className="absolute right-2 top-1/2 transform -translate-y-1/2 h-8 w-8 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
-                onClick={() => navigateImage('next')}
-              >
-                <ChevronRight className="h-4 w-4" />
-              </Button>
-              
-              {/* Image Counter */}
-              <div className="absolute bottom-2 right-2 bg-black/50 text-white px-2 py-1 rounded text-xs opacity-0 group-hover:opacity-100 transition-opacity">
-                {currentImageIndex + 1} / {allImages.length}
-              </div>
-            </>
-          )}
-          
-          {/* Gallery Badge */}
-          {allImages.length > 1 && (
-            <Badge className="absolute top-2 left-2 bg-black/50 text-white border-none">
-              <Images className="h-3 w-3 mr-1" />
-              {allImages.length}
-            </Badge>
-          )}
-        </div>
-      )}
+      <div className="aspect-video relative overflow-hidden group">
+        {allImages.length > 0 ? (
+          <>
+            <img
+              src={allImages[currentImageIndex]}
+              alt={meal.title}
+              className="w-full h-full object-cover"
+            />
+            
+            {/* Image Navigation */}
+            {allImages.length > 1 && (
+              <>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  className="absolute left-2 top-1/2 transform -translate-y-1/2 h-8 w-8 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                  onClick={() => navigateImage('prev')}
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+                
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  className="absolute right-2 top-1/2 transform -translate-y-1/2 h-8 w-8 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                  onClick={() => navigateImage('next')}
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+                
+                {/* Image Counter */}
+                <div className="absolute bottom-2 right-2 bg-black/50 text-white px-2 py-1 rounded text-xs opacity-0 group-hover:opacity-100 transition-opacity">
+                  {currentImageIndex + 1} / {allImages.length}
+                </div>
+              </>
+            )}
+            
+            {/* Gallery Badge */}
+            {allImages.length > 1 && (
+              <Badge className="absolute top-2 left-2 bg-black/50 text-white border-none">
+                <Images className="h-3 w-3 mr-1" />
+                {allImages.length}
+              </Badge>
+            )}
+          </>
+        ) : (
+          // Placeholder for meals without images
+          <div className="w-full h-full bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center">
+            <div className="text-center text-gray-400">
+              <ChefHat className="h-12 w-12 mx-auto mb-2" />
+              <p className="text-sm font-medium">No Photo</p>
+            </div>
+          </div>
+        )}
+      </div>
       
       <CardHeader className="pb-3">
         <div className="flex items-start justify-between">
