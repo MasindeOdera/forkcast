@@ -116,7 +116,7 @@ export default function MealSuggestionForm({ onSuggestionsReceived }) {
                   <SelectValue placeholder="Any" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Any</SelectItem>
+                  <SelectItem value="any">Any</SelectItem>
                   <SelectItem value="vegetarian">Vegetarian</SelectItem>
                   <SelectItem value="vegan">Vegan</SelectItem>
                   <SelectItem value="gluten-free">Gluten-Free</SelectItem>
