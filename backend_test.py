@@ -300,6 +300,7 @@ class ForkcastAPITester:
             
         try:
             url = f"{self.base_url}/meals/{self.test_meal_id}"
+            print(f"DEBUG: Updating meal with ID: {self.test_meal_id}")
             payload = {
                 "title": f"Updated Test Meal {int(time.time())}",
                 "ingredients": "Updated ingredients list",
