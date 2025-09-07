@@ -388,7 +388,7 @@ export default function App() {
               </Button>
             </div>
 
-            <TabsContent value="discover" className="space-y-6">
+            <TabsContent value="discover" className="space-y-6 animate-fade-in-up">
               {filteredMeals.length === 0 ? (
                 <div className="text-center py-12">
                   <UtensilsCrossed className="mx-auto h-12 w-12 text-muted-foreground" />
@@ -397,7 +397,7 @@ export default function App() {
                     {searchQuery ? 'Try adjusting your search terms' : 'Be the first to share a meal!'}
                   </p>
                   <Button 
-                    className="mt-4"
+                    className="mt-4 button-smooth"
                     onClick={() => {
                       setEditingMeal(null);
                       setShowMealForm(true);
@@ -409,15 +409,16 @@ export default function App() {
                 </div>
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {filteredMeals.map((meal) => (
-                    <MealCard
-                      key={meal.id}
-                      meal={meal}
-                      currentUserId={user.id}
-                      onEdit={handleEditMeal}
-                      onDelete={handleDeleteMeal}
-                      onAddToMealPlan={handleAddToMealPlan}
-                    />
+                  {filteredMeals.map((meal, index) => (
+                    <div key={meal.id} className="stagger-animation" style={{animationDelay: `${index * 0.1}s`}}>
+                      <MealCard
+                        meal={meal}
+                        currentUserId={user.id}
+                        onEdit={handleEditMeal}
+                        onDelete={handleDeleteMeal}
+                        onAddToMealPlan={handleAddToMealPlan}
+                      />
+                    </div>
                   ))}
                 </div>
               )}
