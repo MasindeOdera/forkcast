@@ -217,7 +217,53 @@ backend:
           comment: "Fixed by removing 'format: auto' parameter from Cloudinary upload configuration. POST /api/upload now works correctly with proper file validation, size limits, and returns Cloudinary URL with metadata."
 
 frontend:
-  # Frontend testing not performed as per instructions
+  - task: "Password Visibility Toggle"
+    implemented: false
+    working: "NA"
+    file: "components/AuthForm.js"
+    stuck_count: 0
+    priority: "medium"
+    needs_retesting: true
+    status_history:
+        - working: "NA"
+          agent: "main"
+          comment: "User requested password visibility toggle in login/register forms. Need to add eye icon to show/hide password."
+
+  - task: "Drag and Drop in AI Ideas Section"
+    implemented: true
+    working: false
+    file: "components/MealPlanningCalendar.js"
+    stuck_count: 1
+    priority: "high"
+    needs_retesting: true
+    status_history:
+        - working: false
+          agent: "user"
+          comment: "User reported drag and drop functionality not working in AI Ideas section of the calendar. Feature exists but may not be working correctly."
+
+  - task: "Duplicate Meal Issue in Discover Section"
+    implemented: true
+    working: false
+    file: "components/MealPlanningCalendar.js"
+    stuck_count: 1
+    priority: "high"
+    needs_retesting: true
+    status_history:
+        - working: false
+          agent: "user"
+          comment: "User sees duplicate meals in Discover section. When a meal is added from another user, they want the newly added meal to replace the original for that user, keeping them as separate meal plans."
+
+  - task: "Button Positioning in Meal Cards"
+    implemented: true
+    working: false
+    file: "components/MealCard.js"
+    stuck_count: 0
+    priority: "low"
+    needs_retesting: true
+    status_history:
+        - working: false
+          agent: "user"
+          comment: "User wants 'Add to plan' button to appear underneath 'View recipe' button in meal cards instead of side by side."
 
 metadata:
   created_by: "testing_agent"
