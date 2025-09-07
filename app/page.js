@@ -238,11 +238,26 @@ export default function App() {
     }
   };
 
-  const filteredMeals = meals.filter(meal =>
-    meal.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    meal.ingredients.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    meal.user?.username.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filteredMeals = meals.filter(meal => {
+    // First apply search filter
+    const matchesSearch = meal.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      meal.ingredients.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      meal.user?.username.toLowerCase().includes(searchQuery.toLowerCase());
+    
+    if (!matchesSearch) return false;
+    
+    // Filter out user's own meals from discover tab
+    if (meal.userId === user.id) return false;
+    
+    // Filter out meals that the user has already copied (check if user has a meal with "(from username)" in title)
+    const hasCopiedMeal = myMeals.some(userMeal => 
+      userMeal.title.includes(`(from ${meal.user?.username})`) && 
+      userMeal.ingredients === meal.ingredients &&
+      userMeal.instructions === meal.instructions
+    );
+    
+    return !hasCopiedMeal;
+  });
 
   const filteredMyMeals = myMeals.filter(meal =>
     meal.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
