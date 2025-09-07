@@ -108,16 +108,28 @@ export async function GET(request, { params }) {
 
       const startDate = url.searchParams.get('startDate');
       const endDate = url.searchParams.get('endDate');
+      const includeOthers = url.searchParams.get('includeOthers') === 'true';
 
       try {
-        let query = { userId: user.userId };
+        let query = {};
+        
+        if (!includeOthers) {
+          query.userId = user.userId;
+        }
         
         if (startDate && endDate) {
           query.dateRange = { start: startDate, end: endDate };
         }
 
         const mealPlans = await db.collection('meal_plans').find(query);
-        return withCors(NextResponse.json(mealPlans));
+        
+        // Add ownership information
+        const mealPlansWithOwnership = mealPlans.map(plan => ({
+          ...plan,
+          isOwn: plan.userId === user.userId
+        }));
+        
+        return withCors(NextResponse.json(mealPlansWithOwnership));
       } catch (error) {
         console.error('Error fetching meal plans:', error);
         return withCors(NextResponse.json({ 
