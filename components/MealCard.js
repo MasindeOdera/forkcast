@@ -245,14 +245,14 @@ export default function MealCard({ meal, currentUserId, onEdit, onDelete, onAddT
       }
       
       // Ingredients section
-      addSectionHeader('Ingredients', '🥘');
+      addSectionHeader('Ingredients', '[INGREDIENTS]');
       const ingredients = formatIngredients(meal.ingredients);
       addListItems(ingredients, false);
       
       currentY += 5; // Extra space between sections
       
       // Instructions section
-      addSectionHeader('Instructions', '👨‍🍳');
+      addSectionHeader('Instructions', '[INSTRUCTIONS]');
       const instructions = formatInstructions(meal.instructions);
       addListItems(instructions, true);
       
