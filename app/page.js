@@ -356,18 +356,18 @@ export default function App() {
           <Tabs value={activeTab} onValueChange={setActiveTab}>
             <div className="flex items-center justify-between">
               <TabsList>
-                <TabsTrigger value="discover" className="flex items-center gap-2">
+                <TabsTrigger value="discover" className="flex items-center gap-2 tab-trigger">
                   <Users className="h-4 w-4" />
                   <span className="hidden sm:inline">Discover</span>
                 </TabsTrigger>
-                <TabsTrigger value="my-meals" className="flex items-center gap-2">
+                <TabsTrigger value="my-meals" className="flex items-center gap-2 tab-trigger">
                   <ChefHat className="h-4 w-4" />
                   <span className="hidden sm:inline">My Meals</span>
                   <Badge variant="secondary" className="ml-1">
                     {myMeals.length}
                   </Badge>
                 </TabsTrigger>
-                <TabsTrigger value="ai-suggestions" className="flex items-center gap-2">
+                <TabsTrigger value="ai-suggestions" className="flex items-center gap-2 tab-trigger">
                   <Sparkles className="h-4 w-4" />
                   <span className="hidden sm:inline">AI Ideas</span>
                   <Badge variant="secondary" className="ml-1 bg-primary/10 text-primary">
