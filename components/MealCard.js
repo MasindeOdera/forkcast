@@ -276,13 +276,36 @@ export default function MealCard({ meal, currentUserId, onEdit, onDelete, onAddT
             
             <DialogContent className="max-w-2xl max-h-[80vh]">
               <DialogHeader>
-                <DialogTitle className="text-xl">{meal.title}</DialogTitle>
-                <div className="flex items-center gap-2 text-muted-foreground">
-                  <User className="h-4 w-4" />
-                  <span>by {meal.user?.username}</span>
-                  <span>•</span>
-                  <Clock className="h-4 w-4" />
-                  <span>{formatDistanceToNow(new Date(meal.createdAt), { addSuffix: true })}</span>
+                <div className="flex items-start justify-between">
+                  <div className="flex-1">
+                    <DialogTitle className="text-xl">{meal.title}</DialogTitle>
+                    <div className="flex items-center gap-2 text-muted-foreground">
+                      <User className="h-4 w-4" />
+                      <span>by {meal.user?.username}</span>
+                      <span>•</span>
+                      <Clock className="h-4 w-4" />
+                      <span>{formatDistanceToNow(new Date(meal.createdAt), { addSuffix: true })}</span>
+                    </div>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={downloadRecipeAsPDF}
+                    disabled={isDownloading}
+                    className="ml-4 shrink-0"
+                  >
+                    {isDownloading ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Generating...
+                      </>
+                    ) : (
+                      <>
+                        <Download className="mr-2 h-4 w-4" />
+                        Download PDF
+                      </>
+                    )}
+                  </Button>
                 </div>
               </DialogHeader>
               
