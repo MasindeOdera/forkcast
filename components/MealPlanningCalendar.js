@@ -1,0 +1,300 @@
+'use client';
+
+import { useState, useEffect } from 'react';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Calendar, ChefHat, Plus, Utensils, Coffee, Clock, Sparkles } from 'lucide-react';
+import { format, startOfWeek, addDays, isSameDay, parseISO } from 'date-fns';
+
+const MEAL_TYPES = [
+  { value: 'breakfast', label: 'Breakfast', icon: Coffee },
+  { value: 'lunch', label: 'Lunch', icon: Utensils },
+  { value: 'dinner', label: 'Dinner', icon: ChefHat },
+];
+
+export default function MealPlanningCalendar() {
+  const [currentWeek, setCurrentWeek] = useState(() => startOfWeek(new Date()));
+  const [mealPlan, setMealPlan] = useState({});
+  const [userMeals, setUserMeals] = useState([]);
+  const [showMealSelector, setShowMealSelector] = useState(false);
+  const [selectedSlot, setSelectedSlot] = useState(null);
+  const [aiSuggestions, setAiSuggestions] = useState('');
+  const [loadingMeals, setLoadingMeals] = useState(true);
+
+  // Load user's meals
+  useEffect(() => {
+    loadUserMeals();
+  }, []);
+
+  const loadUserMeals = async () => {
+    try {
+      const token = localStorage.getItem('forkcast_token');
+      const user = JSON.parse(localStorage.getItem('forkcast_user') || '{}');
+      
+      const response = await fetch(`/api/meals?userId=${user.id}`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      
+      if (response.ok) {
+        const meals = await response.json();
+        setUserMeals(meals);
+      }
+    } catch (error) {
+      console.error('Error loading meals:', error);
+    } finally {
+      setLoadingMeals(false);
+    }
+  };
+
+  const weekDays = Array.from({ length: 7 }, (_, i) => addDays(currentWeek, i));
+
+  const getMealForSlot = (date, mealType) => {
+    const dateKey = format(date, 'yyyy-MM-dd');
+    return mealPlan[`${dateKey}-${mealType}`];
+  };
+
+  const addMealToSlot = (date, mealType, meal) => {
+    const dateKey = format(date, 'yyyy-MM-dd');
+    setMealPlan(prev => ({
+      ...prev,
+      [`${dateKey}-${mealType}`]: meal
+    }));
+    setShowMealSelector(false);
+    setSelectedSlot(null);
+  };
+
+  const removeMealFromSlot = (date, mealType) => {
+    const dateKey = format(date, 'yyyy-MM-dd');
+    setMealPlan(prev => {
+      const newPlan = { ...prev };
+      delete newPlan[`${dateKey}-${mealType}`];
+      return newPlan;
+    });
+  };
+
+  const openMealSelector = (date, mealType) => {
+    setSelectedSlot({ date, mealType });
+    setShowMealSelector(true);
+  };
+
+  const generateWeeklyAISuggestions = async () => {
+    try {
+      const token = localStorage.getItem('forkcast_token');
+      const response = await fetch('/api/meal-suggestions', {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          prompt: `Create a weekly meal plan for ${format(currentWeek, 'MMMM do')} with variety and balance. Include breakfast, lunch, and dinner suggestions that are practical and delicious.`,
+          mealType: 'weekly-plan'
+        })
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        setAiSuggestions(data.suggestions);
+      }
+    } catch (error) {
+      console.error('Error getting AI suggestions:', error);
+    }
+  };
+
+  const navigateWeek = (direction) => {
+    setCurrentWeek(prev => addDays(prev, direction * 7));
+  };
+
+  const getMealTypeColor = (mealType) => {
+    switch (mealType) {
+      case 'breakfast': return 'bg-orange-100 text-orange-800 border-orange-200';
+      case 'lunch': return 'bg-blue-100 text-blue-800 border-blue-200';
+      case 'dinner': return 'bg-purple-100 text-purple-800 border-purple-200';
+      default: return 'bg-gray-100 text-gray-800 border-gray-200';
+    }
+  };
+
+  return (
+    <div className="w-full max-w-7xl mx-auto space-y-6">
+      {/* Header */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle className="flex items-center gap-2">
+                <Calendar className="h-5 w-5 text-primary" />
+                Weekly Meal Planner
+              </CardTitle>
+              <CardDescription>
+                Plan your meals for the week of {format(currentWeek, 'MMMM do, yyyy')}
+              </CardDescription>
+            </div>
+            <div className="flex gap-2">
+              <Button variant="outline" onClick={() => navigateWeek(-1)}>
+                Previous Week
+              </Button>
+              <Button variant="outline" onClick={() => navigateWeek(1)}>
+                Next Week
+              </Button>
+              <Button onClick={generateWeeklyAISuggestions} className="flex items-center gap-2">
+                <Sparkles className="h-4 w-4" />
+                AI Weekly Plan
+              </Button>
+            </div>
+          </div>
+        </CardHeader>
+      </Card>
+
+      {/* Calendar Grid */}
+      <div className="grid grid-cols-8 gap-4">
+        {/* Time slots header */}
+        <div className="space-y-4">
+          <div className="h-12"></div> {/* Spacer for date headers */}
+          {MEAL_TYPES.map(({ value, label, icon: Icon }) => (
+            <Card key={value} className="h-32 flex items-center justify-center">
+              <div className="text-center">
+                <Icon className="h-6 w-6 mx-auto mb-2 text-muted-foreground" />
+                <p className="text-sm font-medium">{label}</p>
+              </div>
+            </Card>
+          ))}
+        </div>
+
+        {/* Calendar days */}
+        {weekDays.map((date) => (
+          <div key={date.toISOString()} className="space-y-4">
+            {/* Date header */}
+            <Card className="h-12 flex items-center justify-center">
+              <div className="text-center">
+                <p className="text-sm font-medium">{format(date, 'EEE')}</p>
+                <p className="text-xs text-muted-foreground">{format(date, 'MMM d')}</p>
+              </div>
+            </Card>
+
+            {/* Meal slots */}
+            {MEAL_TYPES.map(({ value: mealType }) => {
+              const plannedMeal = getMealForSlot(date, mealType);
+              
+              return (
+                <Card key={mealType} className="h-32 relative group cursor-pointer hover:shadow-md transition-shadow">
+                  <CardContent className="p-3 h-full">
+                    {plannedMeal ? (
+                      <div className="h-full flex flex-col">
+                        <div className="flex-1">
+                          <h4 className="text-xs font-medium line-clamp-2 mb-1">
+                            {plannedMeal.title}
+                          </h4>
+                          <Badge className={`text-xs ${getMealTypeColor(mealType)}`}>
+                            {MEAL_TYPES.find(t => t.value === mealType)?.label}
+                          </Badge>
+                        </div>
+                        <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-6 px-2 text-xs"
+                            onClick={() => openMealSelector(date, mealType)}
+                          >
+                            Change
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-6 px-2 text-xs"
+                            onClick={() => removeMealFromSlot(date, mealType)}
+                          >
+                            Remove
+                          </Button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div 
+                        className="h-full flex items-center justify-center border-2 border-dashed border-muted-foreground/25 rounded hover:border-muted-foreground/50 transition-colors"
+                        onClick={() => openMealSelector(date, mealType)}
+                      >
+                        <div className="text-center">
+                          <Plus className="h-4 w-4 mx-auto mb-1 text-muted-foreground" />
+                          <p className="text-xs text-muted-foreground">Add meal</p>
+                        </div>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </div>
+        ))}
+      </div>
+
+      {/* AI Suggestions */}
+      {aiSuggestions && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Sparkles className="h-5 w-5 text-primary" />
+              AI Weekly Meal Plan Suggestions
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="prose max-w-none text-sm">
+              {aiSuggestions.split('\n').map((line, i) => (
+                <p key={i} className="mb-2">{line}</p>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Meal Selector Dialog */}
+      <Dialog open={showMealSelector} onOpenChange={setShowMealSelector}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>
+              Select Meal for {selectedSlot && format(selectedSlot.date, 'EEEE, MMMM do')} - {' '}
+              {selectedSlot && MEAL_TYPES.find(t => t.value === selectedSlot.mealType)?.label}
+            </DialogTitle>
+          </DialogHeader>
+          
+          <div className="space-y-4 max-h-96 overflow-y-auto">
+            {loadingMeals ? (
+              <p className="text-center text-muted-foreground">Loading your meals...</p>
+            ) : userMeals.length === 0 ? (
+              <p className="text-center text-muted-foreground">
+                No meals available. Create some meals first!
+              </p>
+            ) : (
+              userMeals.map((meal) => (
+                <Card 
+                  key={meal.id} 
+                  className="cursor-pointer hover:shadow-md transition-shadow"
+                  onClick={() => selectedSlot && addMealToSlot(selectedSlot.date, selectedSlot.mealType, meal)}
+                >
+                  <CardContent className="p-4">
+                    <div className="flex items-center gap-3">
+                      {meal.imageUrl && (
+                        <img 
+                          src={meal.imageUrl} 
+                          alt={meal.title}
+                          className="w-12 h-12 object-cover rounded"
+                        />
+                      )}
+                      <div className="flex-1">
+                        <h4 className="font-medium">{meal.title}</h4>
+                        <p className="text-sm text-muted-foreground line-clamp-1">
+                          {meal.ingredients.split('\n')[0]}
+                        </p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
