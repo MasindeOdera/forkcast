@@ -1,30 +1,46 @@
 # 🍴 Forkcast - Your Personal Meal Planning Companion
 
-Forkcast is a modern meal planning app built with Next.js 15, MongoDB, and AI-powered suggestions. Create, share, and discover amazing meal ideas with photos, ingredients, and step-by-step cooking instructions.
+Forkcast is a modern meal planning app built with Next.js 15, Supabase (PostgreSQL), and AI-powered suggestions. Create, share, and discover amazing meal ideas with photos, ingredients, and step-by-step cooking instructions. Features intelligent meal planning calendar with drag-and-drop functionality.
 
 ## ✨ Features
 
 ### Core Features ✅
-- **User Authentication**: Secure JWT-based registration and login
-- **Meal Management**: Create, edit, delete, and organize your meal ideas
-- **Photo Upload**: High-quality image uploads via Cloudinary integration
-- **Meal Discovery**: Browse and search meals from other users
-- **Responsive Design**: Beautiful UI built with Radix UI components
+- **User Authentication**: Secure JWT-based registration and login with password visibility toggle
+- **Meal Management**: Create, edit, delete, and organize your meal ideas with gallery support
+- **Photo Upload**: High-quality image uploads via Cloudinary integration + placeholder images
+- **Meal Discovery**: Browse and search meals from other users with smart duplicate filtering
+- **Weekly Meal Planner**: Interactive calendar with drag-and-drop meal scheduling
+- **Responsive Design**: Beautiful UI built with Radix UI components and mobile-optimized layout
+
+### Enhanced User Experience 🎨
+- **Password Visibility Toggle**: Eye/EyeOff icons to show/hide passwords during login/registration
+- **Placeholder Images**: Beautiful ChefHat icon placeholders for meals without photos
+- **Smart Duplicate Filtering**: Copied community meals automatically hidden from discovery
+- **Button Layout**: Vertical button arrangement for better mobile experience
+- **Gallery Support**: Multiple image uploads with thumbnail navigation
+- **Drag & Drop**: Intuitive meal scheduling by dragging meals to calendar slots
 
 ### AI-Powered Features 🤖
-- **AI Meal Suggestions**: Get personalized meal ideas based on:
-  - Available ingredients
-  - Dietary preferences (vegetarian, vegan, keto, etc.)
-  - Cuisine preferences (Italian, Mexican, Indian, etc.)
-  - Meal type (breakfast, lunch, dinner, snacks)
-  - Custom prompts and preferences
+- **Enhanced AI Ideas Section**: Generates draggable meal cards from AI suggestions
+- **Interactive Meal Planning**: Drag AI-generated meals directly to weekly calendar
+- **Personalized Suggestions**: Based on ingredients, dietary preferences, and cuisine styles
+- **AI Meal Categories**: Support for breakfast, lunch, dinner, snacks, desserts, and appetizers
+- **Contextual Recommendations**: Smart suggestions based on user preferences and available ingredients
+
+### Community Features 👥
+- **Meal Sharing**: Share your creations with the Forkcast community
+- **Community Discovery**: Browse meals from other users with attribution
+- **Smart Copy System**: "Add to My Meal Plan" with automatic duplicate prevention
+- **User Attribution**: Clear meal ownership with "by username" badges
+- **Clean Data**: Production-ready with test data cleanup procedures
 
 ### Technical Features 🛠️
-- **Next.js 15**: Latest version with App Router
-- **MongoDB**: NoSQL database for flexible data storage
+- **Next.js 15**: Latest version with App Router and React Server Components
+- **Supabase**: PostgreSQL database with real-time capabilities
 - **Cloudinary**: Professional image hosting and optimization
-- **JWT Authentication**: Secure token-based authentication
-- **Emergent LLM**: AI-powered meal suggestions using GPT-4
+- **JWT Authentication**: Secure token-based authentication with proper error handling
+- **Emergent LLM**: AI-powered meal suggestions using advanced language models
+- **DND Kit**: Professional drag-and-drop functionality with accessibility support
 
 ## 🚀 Quick Start
 
