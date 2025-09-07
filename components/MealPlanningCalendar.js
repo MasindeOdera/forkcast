@@ -599,17 +599,35 @@ export default function MealPlanningCalendar() {
                         >
                           <CardContent className="p-4">
                             <div className="flex items-center gap-3">
-                              {meal.imageUrl ? (
-                                <img 
-                                  src={meal.imageUrl} 
-                                  alt={meal.title}
-                                  className="w-12 h-12 object-cover rounded"
-                                />
-                              ) : (
-                                <div className="w-12 h-12 bg-gradient-to-br from-gray-100 to-gray-200 rounded flex items-center justify-center">
-                                  <ChefHat className="h-6 w-6 text-gray-400" />
-                                </div>
-                              )}
+                            <div className="flex items-center gap-3">
+                              {(() => {
+                                // Get first available image from main image or gallery
+                                const allImages = [
+                                  ...(meal.imageUrl ? [meal.imageUrl] : []),
+                                  ...(meal.galleryImages || [])
+                                ];
+                                const firstImage = allImages[0];
+                                
+                                return firstImage ? (
+                                  <div className="relative">
+                                    <img 
+                                      src={firstImage} 
+                                      alt={meal.title}
+                                      className="w-12 h-12 object-cover rounded"
+                                    />
+                                    {/* Gallery indicator badge for meals with multiple images */}
+                                    {allImages.length > 1 && (
+                                      <div className="absolute -top-1 -right-1 bg-primary text-primary-foreground text-xs rounded-full w-5 h-5 flex items-center justify-center font-medium">
+                                        {allImages.length}
+                                      </div>
+                                    )}
+                                  </div>
+                                ) : (
+                                  <div className="w-12 h-12 bg-gradient-to-br from-gray-100 to-gray-200 rounded flex items-center justify-center">
+                                    <ChefHat className="h-6 w-6 text-gray-400" />
+                                  </div>
+                                );
+                              })()
                               <div className="flex-1">
                                 <h4 className="font-medium">{meal.title}</h4>
                                 <p className="text-sm text-muted-foreground line-clamp-1">
