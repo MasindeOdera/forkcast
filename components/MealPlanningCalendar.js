@@ -50,6 +50,26 @@ export default function MealPlanningCalendar() {
     }
   };
 
+  const loadUserMeals = async () => {
+    try {
+      const token = localStorage.getItem('forkcast_token');
+      const user = JSON.parse(localStorage.getItem('forkcast_user') || '{}');
+      
+      const response = await fetch(`/api/meals?userId=${user.id}`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      
+      if (response.ok) {
+        const meals = await response.json();
+        setUserMeals(meals);
+      }
+    } catch (error) {
+      console.error('Error loading meals:', error);
+    } finally {
+      setLoadingMeals(false);
+    }
+  };
+
   const loadMealPlan = async () => {
     try {
       const token = localStorage.getItem('forkcast_token');
@@ -80,26 +100,6 @@ export default function MealPlanningCalendar() {
       }
     } catch (error) {
       console.error('Error loading meal plan:', error);
-    }
-  };
-
-  const loadUserMeals = async () => {
-    try {
-      const token = localStorage.getItem('forkcast_token');
-      const user = JSON.parse(localStorage.getItem('forkcast_user') || '{}');
-      
-      const response = await fetch(`/api/meals?userId=${user.id}`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-      
-      if (response.ok) {
-        const meals = await response.json();
-        setUserMeals(meals);
-      }
-    } catch (error) {
-      console.error('Error loading meals:', error);
-    } finally {
-      setLoadingMeals(false);
     }
   };
 
