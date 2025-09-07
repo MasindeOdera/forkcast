@@ -41,14 +41,16 @@ export default function MealForm({
           : Array.isArray(initialData.instructions)
             ? initialData.instructions.join('\n')
             : '',
-        imageUrl: initialData.imageUrl || null
+        imageUrl: initialData.imageUrl || null,
+        galleryImages: initialData.galleryImages || []
       });
     } else {
       setFormData({
         title: '',
         ingredients: '',
         instructions: '',
-        imageUrl: null
+        imageUrl: null,
+        galleryImages: []
       });
     }
   }, [initialData, isOpen]);
