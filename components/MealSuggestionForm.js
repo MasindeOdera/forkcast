@@ -13,8 +13,8 @@ export default function MealSuggestionForm({ onSuggestionsReceived }) {
   const [formData, setFormData] = useState({
     prompt: '',
     ingredients: '',
-    dietary: '',
-    cuisine: '',
+    dietary: 'any',
+    cuisine: 'any',
     mealType: 'dinner'
   });
 
