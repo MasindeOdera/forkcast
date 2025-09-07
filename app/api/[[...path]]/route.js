@@ -460,11 +460,18 @@ export async function PUT(request, { params }) {
       const mealId = path.split('/')[1];
       const { title, ingredients, instructions, imageUrl } = await request.json();
       
+      console.log(`DEBUG PUT: mealId=${mealId}, userId=${user.userId}`);
+      
       // Check if meal exists and belongs to user
       const existingMeal = await db.collection('meals').findOne({ 
         id: mealId, 
         userId: user.userId 
       });
+      
+      console.log(`DEBUG PUT: existingMeal found=${!!existingMeal}`);
+      if (existingMeal) {
+        console.log(`DEBUG PUT: existingMeal.id=${existingMeal.id}, existingMeal.userId=${existingMeal.userId}`);
+      }
       
       if (!existingMeal) {
         return withCors(NextResponse.json({ error: 'Meal not found or unauthorized' }, { status: 404 }));
