@@ -69,6 +69,13 @@ export default function MealForm({
     });
   };
 
+  const handleGalleryUpload = (galleryImages) => {
+    setFormData({
+      ...formData,
+      galleryImages
+    });
+  };
+
   const [formErrors, setFormErrors] = useState({});
 
   const validateForm = () => {
