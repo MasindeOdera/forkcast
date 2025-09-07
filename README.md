@@ -350,40 +350,99 @@ Forkcast is fully responsive and works great on:
 
 ### Common Issues
 
-1. **"JSON parsing error" when creating meals**
+1. **Password visibility toggle not working**
+   - Ensure you're clicking the eye icon on the right side of the password field
+   - Clear browser cache and refresh the page
+   - Check that JavaScript is enabled in your browser
+
+2. **Duplicate meals still showing in Discover**
+   - The filtering happens automatically after copying a meal
+   - Try refreshing the page or switching between tabs
+   - Ensure you're logged in with the correct account
+
+3. **Placeholder images not displaying**
+   - Verify that the ChefHat icon library is loaded (Lucide React)
+   - Check browser console for any CSS or JavaScript errors
+   - Ensure Tailwind CSS is properly configured
+
+4. **Drag and drop not working**
+   - Ensure @dnd-kit libraries are installed (`yarn install`)
+   - Check that draggable elements have proper drag attributes
+   - Verify browser supports HTML5 drag and drop API
+
+5. **"JSON parsing error" when creating meals**
    - Ensure all required fields are filled
-   - Check network connectivity
-   - Verify API endpoints are accessible
+   - Check network connectivity and API accessibility
+   - Verify Supabase connection is working
 
-2. **Image upload fails**
+6. **Image upload fails**
    - Check Cloudinary credentials in `.env`
-   - Ensure image is under 10MB
-   - Verify image format is supported (JPG, PNG, GIF, WebP)
+   - Ensure image is under 10MB and in supported format (JPG, PNG, GIF, WebP)
+   - Verify internet connectivity
 
-3. **AI suggestions not working**
-   - Verify `EMERGENT_LLM_KEY` is set correctly
-   - Check internet connectivity
-   - Ensure prompt is descriptive enough
+7. **AI suggestions not working**
+   - Verify `EMERGENT_LLM_KEY` is set correctly in environment variables
+   - Check internet connectivity and API availability
+   - Ensure prompt is descriptive enough (required field)
+
+8. **Calendar meal plans not persisting**
+   - Check Supabase connection and meal_plans table exists
+   - Verify user authentication is working properly
+   - Check browser network tab for API errors
 
 ### Development Tips
 
-1. **MongoDB Connection Issues**
+1. **Supabase Connection Issues**
    ```bash
-   # Start MongoDB locally
-   mongod --dbpath /path/to/your/db
+   # Verify environment variables
+   echo $NEXT_PUBLIC_SUPABASE_URL
+   echo $SUPABASE_SERVICE_ROLE_KEY
+   
+   # Check Supabase project status in dashboard
+   # Ensure all tables are created with proper schema
    ```
 
 2. **Clear Browser Data**
-   - Clear localStorage if experiencing auth issues
-   - Hard refresh the page (Ctrl+F5)
-
-3. **Check Logs**
    ```bash
-   # View Next.js logs
+   # Clear localStorage if experiencing auth issues
+   localStorage.clear()
+   
+   # Hard refresh the page
+   Ctrl+F5 (Windows/Linux) or Cmd+Shift+R (Mac)
+   ```
+
+3. **Check Application Logs**
+   ```bash
+   # View Next.js development logs
    yarn dev
    
    # Check supervisor logs (production)
    sudo supervisorctl status
+   tail -f /var/log/supervisor/nextjs.out.log
+   ```
+
+4. **Database Debugging**
+   ```sql
+   -- Check table existence in Supabase
+   SELECT table_name FROM information_schema.tables 
+   WHERE table_schema = 'public';
+   
+   -- Verify data integrity
+   SELECT COUNT(*) FROM users;
+   SELECT COUNT(*) FROM meals;
+   SELECT COUNT(*) FROM meal_plans;
+   ```
+
+5. **Component Debugging**
+   ```javascript
+   // Check drag and drop state
+   console.log('Draggable meal:', draggedMeal);
+   
+   // Verify meal data structure
+   console.log('Meal data:', meal);
+   
+   // Check authentication
+   console.log('User token:', localStorage.getItem('forkcast_token'));
    ```
 
 ## 🚀 Deployment
