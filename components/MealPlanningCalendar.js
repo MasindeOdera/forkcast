@@ -38,18 +38,83 @@ export default function MealPlanningCalendar() {
       const token = localStorage.getItem('forkcast_token');
       const user = JSON.parse(localStorage.getItem('forkcast_user') || '{}');
       
-      const response = await fetch(`/api/meals?userId=${user.id}`, {
+      // Load user's own meals
+      const userResponse = await fetch(`/api/meals?userId=${user.id}`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       
-      if (response.ok) {
-        const meals = await response.json();
-        setUserMeals(meals);
+      if (userResponse.ok) {
+        const userMealsData = await userResponse.json();
+        setUserMeals(userMealsData);
+      }
+
+      // Load all meals for community view
+      const allResponse = await fetch('/api/meals', {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      
+      if (allResponse.ok) {
+        const allMealsData = await allResponse.json();
+        setAllMeals(allMealsData);
       }
     } catch (error) {
       console.error('Error loading meals:', error);
     } finally {
       setLoadingMeals(false);
+    }
+  };
+
+  // Drag and drop functions
+  const handleDragStart = (e, meal) => {
+    setDraggedMeal(meal);
+    e.dataTransfer.effectAllowed = 'move';
+  };
+
+  const handleDragOver = (e) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+  };
+
+  const handleDrop = (e, date, mealType) => {
+    e.preventDefault();
+    if (draggedMeal) {
+      addMealToSlot(date, mealType, draggedMeal);
+      setDraggedMeal(null);
+    }
+  };
+
+  const handleAddToMealPlan = (meal) => {
+    // Copy the meal to current user's collection first
+    copyMealToUser(meal);
+  };
+
+  const copyMealToUser = async (meal) => {
+    try {
+      const token = localStorage.getItem('forkcast_token');
+      const response = await fetch('/api/meals', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          title: `${meal.title} (from ${meal.user?.username})`,
+          ingredients: meal.ingredients,
+          instructions: meal.instructions,
+          imageUrl: meal.imageUrl,
+          galleryImages: meal.galleryImages || []
+        })
+      });
+
+      if (response.ok) {
+        const newMeal = await response.json();
+        // Refresh user meals
+        loadUserMeals();
+        // Show success message or notification
+        console.log('Meal copied successfully!');
+      }
+    } catch (error) {
+      console.error('Error copying meal:', error);
     }
   };
 
