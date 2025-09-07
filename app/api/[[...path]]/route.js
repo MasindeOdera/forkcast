@@ -483,7 +483,8 @@ export async function PUT(request, { params }) {
         ...(title && { title }),
         ...(ingredients && { ingredients }),
         ...(instructions && { instructions }),
-        ...(imageUrl && { imageUrl }),
+        ...(imageUrl !== undefined && { imageUrl }),
+        ...(galleryImages !== undefined && { galleryImages }),
         updatedAt: new Date(),
       };
 
