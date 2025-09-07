@@ -38,15 +38,17 @@ export async function GET(request, { params }) {
       }
       
       const userData = await db.collection('users').findOne(
-        { id: user.userId },
-        { projection: { password: 0 } }
+        { id: user.userId }
       );
       
       if (!userData) {
         return withCors(NextResponse.json({ error: 'User not found' }, { status: 404 }));
       }
       
-      return withCors(NextResponse.json(userData));
+      // Manually exclude password field for security
+      const { password, ...userDataWithoutPassword } = userData;
+      
+      return withCors(NextResponse.json(userDataWithoutPassword));
     }
 
     if (path === 'meals') {
