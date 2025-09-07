@@ -77,9 +77,65 @@ export default function MealPlanningCalendar() {
 
   const handleDrop = (e, date, mealType) => {
     e.preventDefault();
+    
+    // Try to get meal from dataTransfer (for AI meals)
+    try {
+      const mealData = e.dataTransfer.getData('application/json');
+      if (mealData) {
+        const meal = JSON.parse(mealData);
+        
+        // If it's an AI-generated meal, first add it to user's collection
+        if (meal.isAIGenerated) {
+          handleAddAIMealToCollection(meal, date, mealType);
+        } else {
+          addMealToSlot(date, mealType, meal);
+        }
+        setDraggedMeal(null);
+        return;
+      }
+    } catch (error) {
+      console.log('No JSON data in drag transfer, using draggedMeal');
+    }
+    
+    // Fallback to existing draggedMeal logic
     if (draggedMeal) {
       addMealToSlot(date, mealType, draggedMeal);
       setDraggedMeal(null);
+    }
+  };
+
+  // Handle AI meal drop - add to collection first, then to calendar
+  const handleAddAIMealToCollection = async (aiMeal, date, mealType) => {
+    try {
+      const token = localStorage.getItem('forkcast_token');
+      const response = await fetch('/api/meals', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          title: `${aiMeal.title} (AI Generated)`,
+          ingredients: aiMeal.ingredients,
+          instructions: aiMeal.instructions,
+          imageUrl: aiMeal.imageUrl,
+          galleryImages: []
+        })
+      });
+
+      if (response.ok) {
+        const newMeal = await response.json();
+        
+        // Add the new meal to the calendar slot
+        addMealToSlot(date, mealType, newMeal);
+        
+        // Refresh user meals to include the new AI meal
+        loadUserMeals();
+        
+        console.log('AI meal added to collection and calendar!');
+      }
+    } catch (error) {
+      console.error('Error adding AI meal:', error);
     }
   };
 
