@@ -296,6 +296,39 @@ export async function POST(request, { params }) {
       }
     }
 
+    if (path === 'meal-plans') {
+      const user = getUserFromToken(request);
+      if (!user) {
+        return withCors(NextResponse.json({ error: 'Unauthorized' }, { status: 401 }));
+      }
+
+      try {
+        const { date, mealType, mealId } = await request.json();
+        
+        if (!date || !mealType || !mealId) {
+          return withCors(NextResponse.json({ 
+            error: 'Date, meal type, and meal ID are required' 
+          }, { status: 400 }));
+        }
+
+        const mealPlan = {
+          userId: user.userId,
+          date,
+          mealType,
+          mealId
+        };
+
+        await db.collection('meal_plans').insertOne(mealPlan);
+        return withCors(NextResponse.json({ success: true, mealPlan }));
+      } catch (error) {
+        console.error('Error creating meal plan:', error);
+        return withCors(NextResponse.json({ 
+          error: 'Failed to create meal plan',
+          details: error.message 
+        }, { status: 500 }));
+      }
+    }
+
     if (path === 'upload') {
       const user = getUserFromToken(request);
       if (!user) {
