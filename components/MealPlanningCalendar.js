@@ -59,7 +59,8 @@ export default function MealPlanningCalendar() {
       const startDate = format(currentWeek, 'yyyy-MM-dd');
       const endDate = format(addDays(currentWeek, 6), 'yyyy-MM-dd');
       
-      const response = await fetch(`/api/meal-plans?startDate=${startDate}&endDate=${endDate}`, {
+      const url = `/api/meal-plans?startDate=${startDate}&endDate=${endDate}${showCommunityPlans ? '&includeOthers=true' : ''}`;
+      const response = await fetch(url, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       
@@ -75,7 +76,10 @@ export default function MealPlanningCalendar() {
             title: plan.meal.title,
             imageUrl: plan.meal.imageUrl,
             ingredients: plan.meal.ingredients,
-            instructions: plan.meal.instructions
+            instructions: plan.meal.instructions,
+            isOwn: plan.isOwn,
+            user: plan.user,
+            planId: plan.id
           };
         });
         
