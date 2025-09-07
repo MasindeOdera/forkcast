@@ -547,9 +547,6 @@ export default function MealPlanningCalendar() {
                                   {meal.ingredients.split('\n')[0]}
                                 </p>
                               </div>
-                              <Badge className="text-xs bg-green-100 text-green-800">
-                                Yours
-                              </Badge>
                             </div>
                           </CardContent>
                         </Card>
