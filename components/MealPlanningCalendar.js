@@ -226,6 +226,7 @@ export default function MealPlanningCalendar() {
 
   const navigateWeek = (direction) => {
     setCurrentWeek(prev => addDays(prev, direction * 7));
+    // loadMealPlan will be called automatically via useEffect when currentWeek changes
   };
 
   const getMealTypeColor = (mealType) => {
