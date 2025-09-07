@@ -115,8 +115,9 @@ export default function MealCard({ meal, currentUserId, onEdit, onDelete, onAddT
         pdf.setFont('helvetica', 'bold');
         pdf.setTextColor(45, 80, 22); // Green color
         
-        // Add icon and title (using text alternatives instead of emojis)
-        pdf.text(`${icon} ${title}`, margin, currentY);
+        // Add title (with icon only if provided)
+        const headerText = icon ? `${icon} ${title}` : title;
+        pdf.text(headerText, margin, currentY);
         currentY += lineHeight;
         
         // Add underline
