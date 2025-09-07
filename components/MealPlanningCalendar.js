@@ -456,37 +456,105 @@ export default function MealPlanningCalendar() {
           
           <div className="space-y-4 max-h-96 overflow-y-auto">
             {loadingMeals ? (
-              <p className="text-center text-muted-foreground">Loading your meals...</p>
-            ) : userMeals.length === 0 ? (
-              <p className="text-center text-muted-foreground">
-                No meals available. Create some meals first!
-              </p>
+              <p className="text-center text-muted-foreground">Loading meals...</p>
             ) : (
-              userMeals.map((meal) => (
-                <Card 
-                  key={meal.id} 
-                  className="cursor-pointer hover:shadow-md transition-shadow"
-                  onClick={() => selectedSlot && addMealToSlot(selectedSlot.date, selectedSlot.mealType, meal)}
-                >
-                  <CardContent className="p-4">
-                    <div className="flex items-center gap-3">
-                      {meal.imageUrl && (
-                        <img 
-                          src={meal.imageUrl} 
-                          alt={meal.title}
-                          className="w-12 h-12 object-cover rounded"
-                        />
-                      )}
-                      <div className="flex-1">
-                        <h4 className="font-medium">{meal.title}</h4>
-                        <p className="text-sm text-muted-foreground line-clamp-1">
-                          {meal.ingredients.split('\n')[0]}
-                        </p>
-                      </div>
+              <div className="space-y-4">
+                {/* User's own meals */}
+                {userMeals.length > 0 && (
+                  <div>
+                    <h4 className="font-medium mb-2 text-sm">Your Meals</h4>
+                    <div className="space-y-2">
+                      {userMeals.map((meal) => (
+                        <Card 
+                          key={meal.id} 
+                          className="cursor-pointer hover:shadow-md transition-shadow"
+                          draggable="true"
+                          onDragStart={(e) => handleDragStart(e, meal)}
+                          onClick={() => selectedSlot && addMealToSlot(selectedSlot.date, selectedSlot.mealType, meal)}
+                        >
+                          <CardContent className="p-4">
+                            <div className="flex items-center gap-3">
+                              {meal.imageUrl && (
+                                <img 
+                                  src={meal.imageUrl} 
+                                  alt={meal.title}
+                                  className="w-12 h-12 object-cover rounded"
+                                />
+                              )}
+                              <div className="flex-1">
+                                <h4 className="font-medium">{meal.title}</h4>
+                                <p className="text-sm text-muted-foreground line-clamp-1">
+                                  {meal.ingredients.split('\n')[0]}
+                                </p>
+                              </div>
+                              <Badge className="text-xs bg-green-100 text-green-800">
+                                Yours
+                              </Badge>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      ))}
                     </div>
-                  </CardContent>
-                </Card>
-              ))
+                  </div>
+                )}
+
+                {/* Community meals */}
+                {showCommunityPlans && allMeals.length > 0 && (
+                  <div>
+                    <h4 className="font-medium mb-2 text-sm">Community Meals</h4>
+                    <div className="space-y-2">
+                      {allMeals.filter(meal => meal.userId !== JSON.parse(localStorage.getItem('forkcast_user') || '{}').id).map((meal) => (
+                        <Card 
+                          key={meal.id} 
+                          className="cursor-pointer hover:shadow-md transition-shadow"
+                          draggable="true"
+                          onDragStart={(e) => handleDragStart(e, meal)}
+                        >
+                          <CardContent className="p-4">
+                            <div className="flex items-center gap-3">
+                              {meal.imageUrl && (
+                                <img 
+                                  src={meal.imageUrl} 
+                                  alt={meal.title}
+                                  className="w-12 h-12 object-cover rounded"
+                                />
+                              )}
+                              <div className="flex-1">
+                                <h4 className="font-medium">{meal.title}</h4>
+                                <p className="text-sm text-muted-foreground line-clamp-1">
+                                  {meal.ingredients.split('\n')[0]}
+                                </p>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <Badge variant="outline" className="text-xs">
+                                  by {meal.user?.username}
+                                </Badge>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleAddToMealPlan(meal);
+                                  }}
+                                  className="h-6 px-2 text-xs"
+                                >
+                                  Copy
+                                </Button>
+                              </div>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {userMeals.length === 0 && (!showCommunityPlans || allMeals.length === 0) && (
+                  <p className="text-center text-muted-foreground">
+                    No meals available. Create some meals first!
+                  </p>
+                )}
+              </div>
             )}
           </div>
         </DialogContent>
