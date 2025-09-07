@@ -436,6 +436,7 @@ export default function App() {
                       currentUserId={user.id}
                       onEdit={handleEditMeal}
                       onDelete={handleDeleteMeal}
+                      onAddToMealPlan={handleAddToMealPlan}
                     />
                   ))}
                 </div>
