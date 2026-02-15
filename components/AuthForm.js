@@ -271,6 +271,86 @@ export default function AuthForm({ onAuthSuccess }) {
           </div>
         )}
       </Card>
+
+      {/* Forgot Password Modal */}
+      <Dialog open={showForgotPassword} onOpenChange={resetForgotPasswordForm}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Mail className="h-5 w-5" />
+              Password Reset Request
+            </DialogTitle>
+            <DialogDescription>
+              Submit a request to the admin to reset your password. Please provide your username and any additional details.
+            </DialogDescription>
+          </DialogHeader>
+
+          {forgotPasswordStatus.submitted ? (
+            <div className="py-6 text-center">
+              <CheckCircle2 className="h-12 w-12 text-green-500 mx-auto mb-4" />
+              <h3 className="text-lg font-semibold mb-2">Request Submitted!</h3>
+              <p className="text-muted-foreground text-sm">
+                Your password reset request has been sent to the admin. You will be contacted once your password has been reset.
+              </p>
+              <Button className="mt-4" onClick={resetForgotPasswordForm}>
+                Close
+              </Button>
+            </div>
+          ) : (
+            <form onSubmit={handleForgotPasswordSubmit}>
+              <div className="space-y-4 py-4">
+                <div className="space-y-2">
+                  <Label htmlFor="forgot-username">Username</Label>
+                  <div className="relative">
+                    <User className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      id="forgot-username"
+                      placeholder="Enter your username"
+                      value={forgotPasswordData.username}
+                      onChange={(e) => setForgotPasswordData({ ...forgotPasswordData, username: e.target.value })}
+                      className="pl-10"
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="forgot-message">Additional Information (Optional)</Label>
+                  <Textarea
+                    id="forgot-message"
+                    placeholder="Any additional details to help identify your account..."
+                    value={forgotPasswordData.message}
+                    onChange={(e) => setForgotPasswordData({ ...forgotPasswordData, message: e.target.value })}
+                    rows={3}
+                  />
+                </div>
+
+                {forgotPasswordStatus.error && (
+                  <div className="p-3 text-sm text-destructive bg-destructive/10 rounded-lg">
+                    {forgotPasswordStatus.error}
+                  </div>
+                )}
+              </div>
+
+              <DialogFooter>
+                <Button type="button" variant="outline" onClick={resetForgotPasswordForm}>
+                  Cancel
+                </Button>
+                <Button type="submit" disabled={forgotPasswordStatus.loading}>
+                  {forgotPasswordStatus.loading ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Submitting...
+                    </>
+                  ) : (
+                    'Submit Request'
+                  )}
+                </Button>
+              </DialogFooter>
+            </form>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
