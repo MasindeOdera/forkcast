@@ -481,7 +481,23 @@ export async function POST(request, { params }) {
           }, { status: 400 }));
         }
 
-        // Return mock suggestions since AI service may not be configured
+        // Call the AI service
+        try {
+          const aiResponse = await fetch('http://localhost:5001/suggest', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ prompt, ingredients, dietary, cuisine, mealType })
+          });
+
+          if (aiResponse.ok) {
+            const aiData = await aiResponse.json();
+            return withCors(NextResponse.json({ suggestions: aiData.suggestions }));
+          }
+        } catch (aiError) {
+          console.log('AI service not available, using fallback:', aiError.message);
+        }
+
+        // Fallback mock suggestions if AI service is not available
         const mockSuggestions = [
           {
             name: "Mediterranean Quinoa Bowl",
