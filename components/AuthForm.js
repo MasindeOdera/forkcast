@@ -179,6 +179,15 @@ export default function AuthForm({ onAuthSuccess }) {
                     'Sign In'
                   )}
                 </Button>
+                <Button
+                  type="button"
+                  variant="link"
+                  className="text-sm text-muted-foreground hover:text-primary"
+                  onClick={() => setShowForgotPassword(true)}
+                >
+                  <HelpCircle className="mr-1 h-3 w-3" />
+                  Forgot your password?
+                </Button>
               </CardFooter>
             </form>
           </TabsContent>
