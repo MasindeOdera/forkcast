@@ -30,6 +30,37 @@ export default function AuthForm({ onAuthSuccess }) {
     setError('');
   };
 
+  const handleForgotPasswordSubmit = async (e) => {
+    e.preventDefault();
+    setForgotPasswordStatus({ submitted: false, loading: true, error: '' });
+
+    try {
+      const response = await fetch('/api/password-reset-request', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(forgotPasswordData),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to submit request');
+      }
+
+      setForgotPasswordStatus({ submitted: true, loading: false, error: '' });
+    } catch (error) {
+      setForgotPasswordStatus({ submitted: false, loading: false, error: error.message });
+    }
+  };
+
+  const resetForgotPasswordForm = () => {
+    setShowForgotPassword(false);
+    setForgotPasswordData({ username: '', message: '' });
+    setForgotPasswordStatus({ submitted: false, loading: false, error: '' });
+  };
+
   const handleSubmit = async (e, isLogin = true) => {
     e.preventDefault();
     setIsLoading(true);
