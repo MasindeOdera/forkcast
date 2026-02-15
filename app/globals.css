@@ -2,6 +2,111 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Smooth transitions for tab content */
+.tab-content-enter {
+    opacity: 0;
+    transform: translateY(10px);
+}
+
+.tab-content-enter-active {
+    opacity: 1;
+    transform: translateY(0);
+    transition: all 300ms ease-out;
+}
+
+.tab-content-exit {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+.tab-content-exit-active {
+    opacity: 0;
+    transform: translateY(-10px);
+    transition: all 200ms ease-in;
+}
+
+/* Fade transition for tab switching */
+.fade-transition {
+    transition: opacity 0.3s ease-in-out, transform 0.3s ease-in-out;
+}
+
+.fade-enter {
+    opacity: 0;
+    transform: translateX(20px);
+}
+
+.fade-enter-to {
+    opacity: 1;
+    transform: translateX(0);
+}
+
+.fade-leave {
+    opacity: 1;
+    transform: translateX(0);
+}
+
+.fade-leave-to {
+    opacity: 0;
+    transform: translateX(-20px);
+}
+
+/* Smooth tab button transitions */
+.tab-trigger {
+    transition: all 0.2s ease-in-out;
+}
+
+.tab-trigger:hover {
+    transform: translateY(-1px);
+}
+
+/* Smooth card hover effects */
+.card-hover {
+    transition: all 0.3s ease-in-out;
+}
+
+.card-hover:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
+}
+
+/* Smooth button transitions */
+.button-smooth {
+    transition: all 0.2s ease-in-out;
+}
+
+.button-smooth:hover {
+    transform: translateY(-1px);
+}
+
+/* Loading animation */
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.animate-fade-in-up {
+    animation: fadeInUp 0.4s ease-out;
+}
+
+/* Stagger animation for meal cards */
+.stagger-animation {
+    animation: fadeInUp 0.5s ease-out forwards;
+    opacity: 0;
+}
+
+.stagger-animation:nth-child(1) { animation-delay: 0.1s; }
+.stagger-animation:nth-child(2) { animation-delay: 0.2s; }
+.stagger-animation:nth-child(3) { animation-delay: 0.3s; }
+.stagger-animation:nth-child(4) { animation-delay: 0.4s; }
+.stagger-animation:nth-child(5) { animation-delay: 0.5s; }
+.stagger-animation:nth-child(6) { animation-delay: 0.6s; }
+
 body {
     margin: 0;
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto",

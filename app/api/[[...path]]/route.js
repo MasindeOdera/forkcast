@@ -396,6 +396,7 @@ export async function POST(request, { params }) {
         ingredients: ingredients.trim(),
         instructions: instructions.trim(),
         imageUrl: imageUrl || null,
+        galleryImages: galleryImages || [],
         createdAt: new Date(),
         updatedAt: new Date(),
       };
@@ -600,7 +601,7 @@ export async function PUT(request, { params }) {
 
     if (path.startsWith('meals/') && path.split('/').length === 2) {
       const mealId = path.split('/')[1];
-      const { title, ingredients, instructions, imageUrl } = await request.json();
+      const { title, ingredients, instructions, imageUrl, galleryImages } = await request.json();
       
       // Check if meal exists and belongs to user
       const existingMeal = await db.collection('meals').findOne({ 
@@ -618,6 +619,7 @@ export async function PUT(request, { params }) {
         ...(ingredients && { ingredients }),
         ...(instructions && { instructions }),
         ...(imageUrl !== undefined && { imageUrl }),
+        ...(galleryImages !== undefined && { galleryImages }),
         updatedAt: new Date(),
       };
 

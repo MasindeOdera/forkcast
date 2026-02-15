@@ -238,11 +238,26 @@ export default function App() {
     }
   };
 
-  const filteredMeals = meals.filter(meal =>
-    meal.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    meal.ingredients.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    meal.user?.username.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filteredMeals = meals.filter(meal => {
+    // First apply search filter
+    const matchesSearch = meal.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      meal.ingredients.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      meal.user?.username.toLowerCase().includes(searchQuery.toLowerCase());
+    
+    if (!matchesSearch) return false;
+    
+    // Filter out user's own meals from discover tab
+    if (meal.userId === user.id) return false;
+    
+    // Filter out meals that the user has already copied (check if user has a meal with "(from username)" in title)
+    const hasCopiedMeal = myMeals.some(userMeal => 
+      userMeal.title.includes(`(from ${meal.user?.username})`) && 
+      userMeal.ingredients === meal.ingredients &&
+      userMeal.instructions === meal.instructions
+    );
+    
+    return !hasCopiedMeal;
+  });
 
   const filteredMyMeals = myMeals.filter(meal =>
     meal.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -341,18 +356,18 @@ export default function App() {
           <Tabs value={activeTab} onValueChange={setActiveTab}>
             <div className="flex items-center justify-between">
               <TabsList>
-                <TabsTrigger value="discover" className="flex items-center gap-2">
+                <TabsTrigger value="discover" className="flex items-center gap-2 tab-trigger">
                   <Users className="h-4 w-4" />
                   <span className="hidden sm:inline">Discover</span>
                 </TabsTrigger>
-                <TabsTrigger value="my-meals" className="flex items-center gap-2">
+                <TabsTrigger value="my-meals" className="flex items-center gap-2 tab-trigger">
                   <ChefHat className="h-4 w-4" />
                   <span className="hidden sm:inline">My Meals</span>
                   <Badge variant="secondary" className="ml-1">
                     {myMeals.length}
                   </Badge>
                 </TabsTrigger>
-                <TabsTrigger value="ai-suggestions" className="flex items-center gap-2">
+                <TabsTrigger value="ai-suggestions" className="flex items-center gap-2 tab-trigger">
                   <Sparkles className="h-4 w-4" />
                   <span className="hidden sm:inline">AI Ideas</span>
                   <Badge variant="secondary" className="ml-1 bg-primary/10 text-primary">
@@ -373,7 +388,7 @@ export default function App() {
               </Button>
             </div>
 
-            <TabsContent value="discover" className="space-y-6">
+            <TabsContent value="discover" className="space-y-6 animate-fade-in-up">
               {filteredMeals.length === 0 ? (
                 <div className="text-center py-12">
                   <UtensilsCrossed className="mx-auto h-12 w-12 text-muted-foreground" />
@@ -382,7 +397,7 @@ export default function App() {
                     {searchQuery ? 'Try adjusting your search terms' : 'Be the first to share a meal!'}
                   </p>
                   <Button 
-                    className="mt-4"
+                    className="mt-4 button-smooth"
                     onClick={() => {
                       setEditingMeal(null);
                       setShowMealForm(true);
@@ -394,21 +409,22 @@ export default function App() {
                 </div>
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {filteredMeals.map((meal) => (
-                    <MealCard
-                      key={meal.id}
-                      meal={meal}
-                      currentUserId={user.id}
-                      onEdit={handleEditMeal}
-                      onDelete={handleDeleteMeal}
-                      onAddToMealPlan={handleAddToMealPlan}
-                    />
+                  {filteredMeals.map((meal, index) => (
+                    <div key={meal.id} className="stagger-animation" style={{animationDelay: `${index * 0.1}s`}}>
+                      <MealCard
+                        meal={meal}
+                        currentUserId={user.id}
+                        onEdit={handleEditMeal}
+                        onDelete={handleDeleteMeal}
+                        onAddToMealPlan={handleAddToMealPlan}
+                      />
+                    </div>
                   ))}
                 </div>
               )}
             </TabsContent>
 
-            <TabsContent value="my-meals" className="space-y-6">
+            <TabsContent value="my-meals" className="space-y-6 animate-fade-in-up">
               {filteredMyMeals.length === 0 ? (
                 <div className="text-center py-12">
                   <ChefHat className="mx-auto h-12 w-12 text-muted-foreground" />
@@ -417,7 +433,7 @@ export default function App() {
                     {searchQuery ? 'No meals match your search' : 'Start building your recipe collection!'}
                   </p>
                   <Button 
-                    className="mt-4"
+                    className="mt-4 button-smooth"
                     onClick={() => {
                       setEditingMeal(null);
                       setShowMealForm(true);
@@ -429,22 +445,23 @@ export default function App() {
                 </div>
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {filteredMyMeals.map((meal) => (
-                    <MealCard
-                      key={meal.id}
-                      meal={meal}
-                      currentUserId={user.id}
-                      onEdit={handleEditMeal}
-                      onDelete={handleDeleteMeal}
-                      onAddToMealPlan={handleAddToMealPlan}
-                    />
+                  {filteredMyMeals.map((meal, index) => (
+                    <div key={meal.id} className="stagger-animation" style={{animationDelay: `${index * 0.1}s`}}>
+                      <MealCard
+                        meal={meal}
+                        currentUserId={user.id}
+                        onEdit={handleEditMeal}
+                        onDelete={handleDeleteMeal}
+                        onAddToMealPlan={handleAddToMealPlan}
+                      />
+                    </div>
                   ))}
                 </div>
               )}
             </TabsContent>
 
-            <TabsContent value="ai-suggestions" className="space-y-6">
-              <div className="flex items-center justify-center">
+            <TabsContent value="ai-suggestions" className="space-y-6 animate-fade-in-up">
+              <div className="fade-transition">
                 <MealSuggestions />
               </div>
             </TabsContent>
