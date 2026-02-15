@@ -303,6 +303,37 @@ export async function POST(request, { params }) {
       }));
     }
 
+    // Password reset request from users (stores request for admin to review)
+    if (path === 'password-reset-request') {
+      const { username, message } = await request.json();
+      
+      if (!username || username.trim().length === 0) {
+        return withCors(NextResponse.json({ error: 'Username is required' }, { status: 400 }));
+      }
+
+      // Check if user exists
+      const user = await db.collection('users').findOne({ username: username.trim() });
+      if (!user) {
+        // Don't reveal if user exists or not for security
+        // But still "accept" the request
+      }
+
+      // Store the password reset request
+      const resetRequest = {
+        id: uuidv4(),
+        username: username.trim(),
+        message: message || '',
+        status: 'pending',
+        createdAt: new Date(),
+      };
+
+      await db.collection('password_reset_requests').insertOne(resetRequest);
+
+      return withCors(NextResponse.json({ 
+        message: 'Password reset request submitted successfully. An admin will review your request.' 
+      }));
+    }
+
     if (path === 'meals') {
       const user = getUserFromToken(request);
       if (!user) {
