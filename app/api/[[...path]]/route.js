@@ -157,6 +157,24 @@ export async function GET(request, { params }) {
       }
     }
 
+    // Admin endpoint to get password reset requests
+    if (path === 'admin/reset-requests') {
+      const url = new URL(request.url);
+      const adminKey = url.searchParams.get('adminKey');
+      
+      const validAdminKey = process.env.ADMIN_RESET_KEY || 'forkcast-admin-reset-2024';
+      if (adminKey !== validAdminKey) {
+        return withCors(NextResponse.json({ error: 'Invalid admin key' }, { status: 403 }));
+      }
+
+      const requests = await db.collection('password_reset_requests')
+        .find({ status: 'pending' })
+        .sort({ createdAt: -1 })
+        .toArray();
+
+      return withCors(NextResponse.json(requests));
+    }
+
     if (path.startsWith('meals/') && path.split('/').length === 2) {
       const mealId = path.split('/')[1];
       const meal = await db.collection('meals').findOne({ id: mealId });
