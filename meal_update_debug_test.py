@@ -6,7 +6,7 @@ import os
 from datetime import datetime
 
 # Get the base URL from environment
-BASE_URL = os.getenv('NEXT_PUBLIC_BASE_URL', 'https://forkcast-planner.preview.emergentagent.com')
+BASE_URL = os.getenv('NEXT_PUBLIC_BASE_URL', 'https://backend-auth-fix-3.preview.emergentagent.com')
 API_BASE = f"{BASE_URL}/api"
 
 def test_meal_update_endpoint():
