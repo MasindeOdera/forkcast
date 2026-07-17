@@ -442,7 +442,21 @@ export async function POST(request, { params }) {
     
   } catch (error) {
     console.error('POST Error:', error);
-    return withCors(NextResponse.json({ error: 'Internal server error' }, { status: 500 }));
+    const message = error?.message || 'Internal server error';
+    // Surface database connection failures explicitly so they're easy to diagnose
+    const isDbError =
+      /ECONNREFUSED|MongoServerSelectionError|Missing Supabase|fetch failed|getaddrinfo|Supabase/i.test(message);
+    return withCors(
+      NextResponse.json(
+        {
+          error: isDbError
+            ? 'Database is unavailable. Please contact the administrator.'
+            : 'Internal server error',
+          details: process.env.NODE_ENV === 'production' ? undefined : message,
+        },
+        { status: 500 }
+      )
+    );
   }
 }
 
