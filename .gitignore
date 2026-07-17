@@ -30,7 +30,7 @@ next-env.d.ts
 dist/
 dist
 
-# Environment files (comprehensive coverage)
+# Sensitive tokens & credentials
 *token.json*
 *credentials.json*
 
@@ -76,70 +76,8 @@ agenthub/agents/youtube/db
 .cache/
 
 # Mobile development
-android-sdk/ node_modules/@next/swc-linux-arm64-musl/next-swc.linux-arm64-musl.node
-node_modules/@next/swc-linux-arm64-gnu/next-swc.linux-arm64-gnu.node
-node_modules/@next/swc-linux-arm64-musl/next-swc.linux-arm64-musl.node
--e 
-# Environment files
-*.env
-*.env.*
--e 
-# Environment files
-*.env
-*.env.*
--e 
-# Environment files
-*.env
-*.env.*
--e 
-# Environment files
-*.env
-*.env.*
--e 
-# Environment files
-*.env
-*.env.*
--e 
-# Environment files
-*.env
-*.env.*
--e 
-# Environment files
-*.env
-*.env.*
--e 
-# Environment files
-*.env
-*.env.*
--e 
-# Environment files
-*.env
-*.env.*
--e 
-# Environment files
-*.env
-*.env.*
--e 
-# Environment files
-*.env
-*.env.*
--e 
-# Environment files
-*.env
-*.env.*
--e 
-# Environment files
-*.env
-*.env.*
--e 
-# Environment files
-*.env
-*.env.*
--e 
-# Environment files
-*.env
-*.env.*
--e 
-# Environment files
-*.env
-*.env.*
+android-sdk/
+
+# Environment files (never commit real secrets)
+.env.local
+.env.*.local
