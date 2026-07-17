@@ -1,5 +1,10 @@
 const nextConfig = {
-  output: 'standalone',
+  // 'standalone' produces a self-contained Node.js server for Docker/VM
+  // deployments (used by the Emergent deploy pipeline). On Vercel this
+  // causes `EnvFileReadError` because Vercel does not ship the .env file
+  // alongside the standalone runtime — Vercel injects env vars via
+  // process.env directly. So disable it when building on Vercel.
+  output: process.env.VERCEL ? undefined : 'standalone',
   images: {
     unoptimized: true,
   },
