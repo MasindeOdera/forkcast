@@ -79,5 +79,7 @@ agenthub/agents/youtube/db
 android-sdk/
 
 # Environment files (never commit real secrets)
+.env
 .env.local
 .env.*.local
+!.env.example
