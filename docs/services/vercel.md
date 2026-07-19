@@ -35,7 +35,22 @@ Every variable from your local `.env` must be added in **Vercel → Project → 
 | `NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET`| Production, Preview, Development |
 | `EMERGENT_LLM_KEY`                    | Production, Preview     |
 
-> Any change to env vars requires a **redeploy** to take effect — Vercel doesn't hot-swap them.
+### ⚠️ `NEXT_PUBLIC_*` vars are baked in at **build time**
+
+This is the single most common Vercel gotcha, so it deserves its own section.
+
+- Any variable prefixed with `NEXT_PUBLIC_` is **inlined into the JavaScript bundle at build time**, because it needs to be available in the browser. It's not read from the environment at runtime.
+- Any variable **without** the prefix is server-only and *is* read from `process.env` at runtime.
+
+Practical consequences:
+
+| You changed…                        | To take effect you need…                                             |
+|-------------------------------------|----------------------------------------------------------------------|
+| A `NEXT_PUBLIC_*` variable          | A **new build** — either push a commit, or *Deployments → ⋯ → Redeploy* **with "Use existing Build Cache" turned OFF**. A plain "Redeploy" of the same commit does *not* rebuild the client bundle by default. |
+| A server-only variable              | Just a redeploy is enough (or sometimes even a function cold start). |
+| Both                                | Do a full clean redeploy to be safe.                                 |
+
+If you find the site "still using the old Cloudinary cloud name" after updating env vars, this is why.
 
 ## Deploy flow
 
@@ -46,9 +61,28 @@ Every variable from your local `.env` must be added in **Vercel → Project → 
    - Other branches / PRs → get a unique **preview URL** you can share.
 4. On failure, the deployment fails and the previous production stays live. Read the build log under **Deployments → the failed deploy → View Build Logs**.
 
+## 🌐 Custom domains
+
+By default, Vercel gives every project an auto-generated domain like `forkcast-six.vercel.app` (the `-six` suffix is Vercel picking a random word to disambiguate). This is fine for demos but usually not what you want long-term.
+
+To add a custom domain:
+
+1. In Vercel: **Project → Settings → Domains → Add**.
+2. Type the domain (e.g. `forkcast.app` or `app.mydomain.com`) and click **Add**.
+3. Vercel shows you DNS records to create at your registrar:
+   - **Apex domain** (e.g. `forkcast.app`): one **A record** → `76.76.21.21`.
+   - **Subdomain** (e.g. `app.mydomain.com`): one **CNAME** → `cname.vercel-dns.com`.
+4. Wait for DNS to propagate (usually minutes; occasionally hours). Vercel provisions the HTTPS certificate automatically via Let's Encrypt.
+5. Once verified:
+   - Update `NEXT_PUBLIC_BASE_URL` to point at the new domain and redeploy.
+   - Update `HEALTHCHECK_URL` in the GitHub Actions secrets so the keepalive hits the right host.
+   - Update any hardcoded links in docs.
+
+You can also set one domain as **primary** so the others 308-redirect to it — useful if you want `www.forkcast.app` to redirect to `forkcast.app`.
+
 ## 🧭 Common tasks
 
 - **See production logs**: *Deployments → Production → Runtime Logs* (server-side `console.log`s show up here).
 - **Roll back**: *Deployments →* pick a previous green build → **Promote to Production**.
-- **Trigger a redeploy without a commit**: *Deployments → ⋯ → Redeploy* on the latest build.
+- **Trigger a redeploy without a commit**: *Deployments → ⋯ → Redeploy* on the latest build. Uncheck **"Use existing Build Cache"** if you changed `NEXT_PUBLIC_*` env vars.
 - **Check env var propagation**: *Settings → Environment Variables* → confirm the variable exists in the target environment, then redeploy.

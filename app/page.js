@@ -270,9 +270,6 @@ export default function App() {
             <h1 className="text-2xl font-bold flex items-center gap-2">
               🍴 <span>Forkcast</span>
             </h1>
-            <Badge variant="secondary" className="hidden sm:inline-flex">
-              Beta
-            </Badge>
           </div>
 
           <div className="flex items-center gap-4">
