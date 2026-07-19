@@ -3,54 +3,57 @@
 This guide walks you through setting up Forkcast for local development.
 
 ## Prerequisites
-- Node.js 18+ installed
-- MongoDB running locally or a MongoDB Atlas account
-- Cloudinary account (free tier available)
+- **Node.js 18+** and **Yarn**
+- A **Supabase** project (free tier works — see [services/supabase.md](./services/supabase.md))
+- A **Cloudinary** account (free tier works — see [services/cloudinary.md](./services/cloudinary.md))
+- An **Emergent LLM key** (for AI meal suggestions)
 
 ## Environment Setup
 
-### 1. Clone and install dependencies
+### 1. Install dependencies
 
 ```bash
 cd /app
 yarn install
 ```
 
+> Always use **yarn**, not npm. Mixing lockfiles will cause dependency drift.
+
 ### 2. Environment Variables
 
-Create or verify your `.env` file contains:
+Create a `.env` file in the project root with the following keys. Placeholder values are shown — replace them with your own.
 
 ```env
-# Database
-MONGO_URL=mongodb://localhost:27017
-DB_NAME=forkcast
+# --- Supabase (Postgres) ---
+NEXT_PUBLIC_SUPABASE_URL=https://<your-project-ref>.supabase.co
+SUPABASE_SERVICE_ROLE_KEY=<service-role-key>          # server-only, keep secret
+NEXT_PUBLIC_SUPABASE_ANON_KEY=<anon-key>              # safe to expose
 
-# Application
+# --- Application ---
 NEXT_PUBLIC_BASE_URL=https://your-deployment-url.example.com
-JWT_SECRET=your_super_secret_jwt_key_for_forkcast_app_2024
+JWT_SECRET=<a-long-random-string>
 
-# Cloudinary (Image Upload)
-NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME=your_cloud_name
-CLOUDINARY_API_KEY=your_api_key
-CLOUDINARY_API_SECRET=your_api_secret
+# --- Cloudinary (Image Upload) ---
+NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME=<your-cloud-name>
+CLOUDINARY_API_KEY=<api-key>
+CLOUDINARY_API_SECRET=<api-secret>
 NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET=Forkcast
 
-# AI Features
-EMERGENT_LLM_KEY=your_emergent_llm_key
+# --- AI Features ---
+EMERGENT_LLM_KEY=<emergent-llm-key>
 ```
 
-> ⚠️ Never commit real secrets to source control. The values above are placeholders.
+> ⚠️ **Never** commit real secrets to git. `.env` is gitignored — keep it that way.
+> Anything prefixed with `NEXT_PUBLIC_` is shipped to the browser; everything else stays server-side only.
 
 ### 3. Start the development server
 
 ```bash
-# For local development
 yarn dev
-
-# Or with custom configuration
-NODE_OPTIONS='--max-old-space-size=512' next dev --hostname 0.0.0.0 --port 3000
 ```
 
-### 4. Open your browser
+### 4. Verify it works
 
-Navigate to `http://localhost:3000`
+- Open `http://localhost:3000` in a browser.
+- Hit the health endpoint to confirm the DB is reachable: `GET /api/health`.
+- See [operations/debugging.md](./operations/debugging.md) if anything looks off.

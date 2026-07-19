@@ -1,8 +1,8 @@
 # 🍴 Forkcast - Your Personal Meal Planning Companion
 
-Forkcast is a modern meal planning app built with Next.js 15, MongoDB, and AI-powered suggestions. Create, share, and discover amazing meal ideas with photos, ingredients, and step-by-step cooking instructions.
+Forkcast is a modern meal planning app built with Next.js, Supabase (Postgres), Cloudinary, and AI-powered suggestions. Create, share, and discover amazing meal ideas with photos, ingredients, and step-by-step cooking instructions.
 
-> 📚 Looking for setup instructions, API reference, or troubleshooting? See the [`docs/`](./docs) folder.
+> 📚 Looking for setup, API reference, service explanations, or debugging help? See the [`docs/`](./docs) folder.
 
 ## ✨ Features
 
@@ -22,11 +22,11 @@ Forkcast is a modern meal planning app built with Next.js 15, MongoDB, and AI-po
   - Custom prompts and preferences
 
 ### Technical Features 🛠️
-- **Next.js 15**: Latest version with App Router
-- **MongoDB**: NoSQL database for flexible data storage
+- **Next.js 14**: App Router, React Server Components
+- **Supabase (Postgres)**: Managed Postgres for relational data storage
 - **Cloudinary**: Professional image hosting and optimization
 - **JWT Authentication**: Secure token-based authentication
-- **Emergent LLM**: AI-powered meal suggestions using GPT-4
+- **Emergent LLM**: AI-powered meal suggestions via an OpenAI-compatible API
 
 ## 🎯 How to Use
 
@@ -58,15 +58,15 @@ Forkcast is a modern meal planning app built with Next.js 15, MongoDB, and AI-po
 ## 🏗️ Architecture
 
 ### Frontend
-- **Framework**: Next.js 15 with App Router
+- **Framework**: Next.js 14 with App Router
 - **Styling**: Tailwind CSS + Radix UI components
 - **Icons**: Lucide React
 - **Notifications**: Sonner for toast messages
 - **Image Upload**: Direct Cloudinary integration
 
 ### Backend
-- **API Routes**: Next.js API routes with catch-all routing
-- **Database**: MongoDB with native driver
+- **API Routes**: Next.js API routes with catch-all routing (`app/api/[[...path]]/route.js`)
+- **Database**: Supabase (Postgres) accessed via `@supabase/supabase-js`
 - **Authentication**: JWT tokens with bcryptjs hashing
 - **File Upload**: Cloudinary integration with validation
 - **AI Integration**: OpenAI-compatible API via Emergent LLM

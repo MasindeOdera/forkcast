@@ -1,14 +1,37 @@
 # 📚 Forkcast Documentation
 
-Welcome to the Forkcast documentation. This folder contains detailed guides for setting up, extending, and maintaining the app. For a high-level overview of features and how to use the app, see the [root README](../README.md).
+Welcome to the Forkcast documentation. This folder contains detailed guides organized by topic. For a high-level overview of features, see the [root README](../README.md).
 
-## Table of Contents
+## 🗺️ Structure
 
-- [Getting Started](./getting-started.md) — Prerequisites, environment variables, and running the dev server
-- [Database Schema](./database-schema.md) — MongoDB collections and document shapes
-- [API Reference](./api-reference.md) — All available API endpoints
-- [UI Components](./ui-components.md) — Key React components used across the app
-- [Security](./security.md) — Authentication, hashing, validation, and CORS setup
-- [Troubleshooting](./troubleshooting.md) — Common issues and development tips
-- [Deployment](./deployment.md) — How and where the app is deployed
-- [Contributing](./contributing.md) — MVP feature checklist and license notes
+```
+docs/
+├── getting-started.md          # Set up the project locally
+├── services/                   # Third-party services we depend on
+│   ├── supabase.md             # Database (Postgres) — how it's used & keepalive
+│   ├── cloudinary.md           # Image hosting & upload flow
+│   └── vercel.md               # Deployment platform
+├── workflow/                   # How we develop and collaborate
+│   ├── github.md               # Branching, commits, PRs (for humans & AI agents)
+│   └── contributing.md         # MVP checklist & license
+├── operations/                 # Running, debugging, and managing data
+│   ├── debugging.md            # Comprehensive debugging guide (frontend → backend → DB)
+│   ├── database-schema.md      # Tables, columns, relationships
+│   └── deployment.md           # How the app is deployed
+└── reference/                  # Reference material
+    ├── api-reference.md        # All API endpoints
+    ├── ui-components.md        # Key React components
+    └── security.md             # Auth, hashing, validation, CORS
+```
+
+## 🚀 I want to…
+
+| Goal                                            | Start here                                              |
+|-------------------------------------------------|---------------------------------------------------------|
+| Run the app on my machine                       | [getting-started.md](./getting-started.md)              |
+| Understand what Supabase / Cloudinary / Vercel do here | [services/](./services)                          |
+| Fix or extend an API endpoint                   | [reference/api-reference.md](./reference/api-reference.md) |
+| Figure out why something is broken              | [operations/debugging.md](./operations/debugging.md)    |
+| Look at or edit real data                       | [operations/debugging.md](./operations/debugging.md) → "Manipulating data" |
+| Open a pull request                             | [workflow/github.md](./workflow/github.md)              |
+| Know why the DB "went to sleep"                 | [services/supabase.md](./services/supabase.md) → "Auto-pause & keepalive" |

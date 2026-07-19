@@ -1,0 +1,47 @@
+# Keeps the Supabase project from auto-pausing on the free tier.
+#
+# Supabase pauses a free-tier project after ~7 days of inactivity. Any
+# successful query resets that timer. This workflow hits GET /api/health
+# (which runs a trivial query against the users table) every 3 days, well
+# under the pause threshold.
+#
+# Setup:
+#   Settings → Secrets and variables → Actions → New repository secret
+#     Name:  HEALTHCHECK_URL
+#     Value: https://<your-deployment>/api/health
+#
+# See docs/services/supabase.md for the full explanation.
+
+name: Supabase Keepalive
+
+on:
+  schedule:
+    # Every 3 days at 09:00 UTC. Cron uses UTC.
+    - cron: '0 9 */3 * *'
+  workflow_dispatch: {}
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping /api/health
+        env:
+          HEALTHCHECK_URL: ${{ secrets.HEALTHCHECK_URL }}
+        run: |
+          if [ -z "$HEALTHCHECK_URL" ]; then
+            echo "::error::HEALTHCHECK_URL secret is not set. See docs/services/supabase.md."
+            exit 1
+          fi
+
+          echo "Pinging $HEALTHCHECK_URL"
+          # -f: fail on HTTP errors, -sS: silent but show errors, -L: follow redirects
+          # We also capture the body so it shows up in the Actions log for debugging.
+          BODY=$(curl -fsSL --max-time 30 "$HEALTHCHECK_URL")
+          echo "Response: $BODY"
+
+          # Fail the job if the DB is reported as down, so we get a GitHub
+          # notification instead of silently "succeeding" while the DB is asleep.
+          echo "$BODY" | grep -q '"db":"ok"' || {
+            echo "::error::Health endpoint reports DB is not OK."
+            exit 1
+          }

@@ -1,6 +1,8 @@
 # 🤝 Contributing
 
-This is a complete MVP with all core features implemented:
+Forkcast is a working MVP. Contributions that improve or extend it are welcome — please follow the process in [github.md](./github.md).
+
+## Current MVP checklist
 
 - ✅ User management with authentication
 - ✅ Meal creation with photo upload
