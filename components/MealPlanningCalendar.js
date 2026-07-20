@@ -6,8 +6,8 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Calendar, ChefHat, Plus, Utensils, Coffee, Clock, Sparkles } from 'lucide-react';
-import { format, startOfWeek, addDays, isSameDay, parseISO } from 'date-fns';
+import { Calendar, ChefHat, Plus, Utensils, Coffee, Clock, Sparkles, ChevronLeft, ChevronRight, Users, X } from 'lucide-react';
+import { format, startOfWeek, addDays, isSameDay, parseISO, isToday } from 'date-fns';
 
 const MEAL_TYPES = [
   { value: 'breakfast', label: 'Breakfast', icon: Coffee },
@@ -26,11 +26,16 @@ export default function MealPlanningCalendar() {
   const [loadingMeals, setLoadingMeals] = useState(true);
   const [showCommunityPlans, setShowCommunityPlans] = useState(false);
   const [draggedMeal, setDraggedMeal] = useState(null);
+  const [selectedDayIndex, setSelectedDayIndex] = useState(0);
 
   // Load user's meals and meal plan data
   useEffect(() => {
     loadUserMeals();
     loadMealPlan();
+    // Default the mobile day picker to today if it falls inside the current week, otherwise first day
+    const todayIdx = Array.from({ length: 7 }, (_, i) => addDays(currentWeek, i))
+      .findIndex((d) => isSameDay(d, new Date()));
+    setSelectedDayIndex(todayIdx >= 0 ? todayIdx : 0);
   }, [currentWeek]);
 
   const loadUserMeals = async () => {
@@ -347,11 +352,12 @@ export default function MealPlanningCalendar() {
   };
 
   return (
-    <div className="w-full max-w-7xl mx-auto space-y-6">
+    <div className="w-full max-w-7xl mx-auto space-y-4 md:space-y-6">
       {/* Header */}
       <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
+        <CardHeader className="p-4 md:p-6">
+          {/* Desktop header (original layout) */}
+          <div className="hidden md:flex items-center justify-between">
             <div>
               <CardTitle className="flex items-center gap-2">
                 <Calendar className="h-5 w-5 text-primary" />
@@ -372,7 +378,6 @@ export default function MealPlanningCalendar() {
                 variant={showCommunityPlans ? "default" : "outline"}
                 onClick={() => {
                   setShowCommunityPlans(!showCommunityPlans);
-                  // Reload meal plans when toggling
                   setTimeout(() => loadMealPlan(), 100);
                 }}
               >
@@ -384,11 +389,200 @@ export default function MealPlanningCalendar() {
               </Button>
             </div>
           </div>
+
+          {/* Mobile header (compact, tailored) */}
+          <div className="md:hidden space-y-3">
+            <div className="flex items-start justify-between gap-2">
+              <div className="min-w-0">
+                <CardTitle className="flex items-center gap-2 text-base">
+                  <Calendar className="h-4 w-4 text-primary shrink-0" />
+                  Weekly Planner
+                </CardTitle>
+                <CardDescription className="text-xs mt-0.5">
+                  Week of {format(currentWeek, 'MMM d, yyyy')}
+                </CardDescription>
+              </div>
+              <Button
+                size="sm"
+                onClick={generateWeeklyAISuggestions}
+                className="flex items-center gap-1.5 shrink-0 h-8 px-3"
+              >
+                <Sparkles className="h-3.5 w-3.5" />
+                <span className="text-xs">AI Plan</span>
+              </Button>
+            </div>
+            <div className="flex items-center justify-between gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => navigateWeek(-1)}
+                className="h-9 w-9 p-0 shrink-0"
+                aria-label="Previous week"
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              <div className="flex-1 text-center text-xs font-medium text-muted-foreground">
+                {format(currentWeek, 'MMM d')} – {format(addDays(currentWeek, 6), 'MMM d')}
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => navigateWeek(1)}
+                className="h-9 w-9 p-0 shrink-0"
+                aria-label="Next week"
+              >
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+              <Button
+                variant={showCommunityPlans ? "default" : "outline"}
+                size="sm"
+                onClick={() => {
+                  setShowCommunityPlans(!showCommunityPlans);
+                  setTimeout(() => loadMealPlan(), 100);
+                }}
+                className="h-9 px-2.5 shrink-0"
+                aria-label="Toggle community plans"
+              >
+                <Users className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
         </CardHeader>
       </Card>
 
-      {/* Calendar Grid */}
-      <div className="grid grid-cols-8 gap-4">
+      {/* Mobile day picker + single-day view */}
+      <div className="md:hidden space-y-3">
+        {/* Horizontal day chips */}
+        <div className="-mx-1 overflow-x-auto scrollbar-hide">
+          <div className="flex gap-2 px-1 pb-1 min-w-max">
+            {weekDays.map((date, idx) => {
+              const isSelected = idx === selectedDayIndex;
+              const isTodayDate = isToday(date);
+              return (
+                <button
+                  key={date.toISOString()}
+                  onClick={() => setSelectedDayIndex(idx)}
+                  className={`
+                    flex flex-col items-center justify-center rounded-xl border transition-all shrink-0
+                    min-w-[56px] h-16 px-2
+                    ${isSelected
+                      ? 'bg-primary text-primary-foreground border-primary shadow-sm'
+                      : 'bg-background text-foreground border-border hover:border-primary/40'}
+                  `}
+                >
+                  <span className={`text-[10px] font-medium uppercase tracking-wide ${isSelected ? 'opacity-90' : 'text-muted-foreground'}`}>
+                    {format(date, 'EEE')}
+                  </span>
+                  <span className="text-lg font-semibold leading-none mt-1">
+                    {format(date, 'd')}
+                  </span>
+                  {isTodayDate && !isSelected && (
+                    <span className="mt-1 h-1 w-1 rounded-full bg-primary" />
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Selected day full label */}
+        <div className="px-1">
+          <h3 className="text-lg font-semibold">
+            {format(weekDays[selectedDayIndex], 'EEEE')}
+            {isToday(weekDays[selectedDayIndex]) && (
+              <span className="ml-2 text-xs font-medium text-primary bg-primary/10 px-2 py-0.5 rounded-full align-middle">
+                Today
+              </span>
+            )}
+          </h3>
+          <p className="text-xs text-muted-foreground">
+            {format(weekDays[selectedDayIndex], 'MMMM d, yyyy')}
+          </p>
+        </div>
+
+        {/* Meal type cards for selected day */}
+        <div className="space-y-3">
+          {MEAL_TYPES.map(({ value: mealType, label, icon: Icon }) => {
+            const date = weekDays[selectedDayIndex];
+            const plannedMeal = getMealForSlot(date, mealType);
+            return (
+              <Card
+                key={mealType}
+                className="overflow-hidden"
+                onDragOver={handleDragOver}
+                onDrop={(e) => handleDrop(e, date, mealType)}
+              >
+                <div className="flex items-center gap-2 px-4 py-2.5 border-b bg-muted/30">
+                  <Icon className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-sm font-medium">{label}</span>
+                  <Badge className={`ml-auto text-[10px] ${getMealTypeColor(mealType)}`}>
+                    {mealType}
+                  </Badge>
+                </div>
+                <CardContent className="p-3">
+                  {plannedMeal ? (
+                    <div className="flex items-center gap-3">
+                      {plannedMeal.imageUrl ? (
+                        <img
+                          src={plannedMeal.imageUrl}
+                          alt={plannedMeal.title}
+                          className="w-16 h-16 rounded-lg object-cover shrink-0"
+                        />
+                      ) : (
+                        <div className="w-16 h-16 rounded-lg bg-muted flex items-center justify-center shrink-0">
+                          <Icon className="h-6 w-6 text-muted-foreground" />
+                        </div>
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <h4 className="font-medium text-sm line-clamp-2">
+                          {plannedMeal.title}
+                        </h4>
+                        {plannedMeal.isOwn === false && (
+                          <Badge variant="outline" className="mt-1 text-[10px] bg-blue-50 text-blue-700 border-blue-200">
+                            by {plannedMeal.user?.username}
+                          </Badge>
+                        )}
+                        <div className="flex gap-2 mt-2">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-7 px-2.5 text-xs flex-1"
+                            onClick={() => openMealSelector(date, mealType)}
+                          >
+                            Change
+                          </Button>
+                          {plannedMeal.isOwn !== false && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="h-7 w-7 p-0 text-muted-foreground hover:text-destructive"
+                              onClick={() => removeMealFromSlot(date, mealType)}
+                              aria-label="Remove meal"
+                            >
+                              <X className="h-3.5 w-3.5" />
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => openMealSelector(date, mealType)}
+                      className="w-full flex items-center justify-center gap-2 py-6 border-2 border-dashed border-muted-foreground/25 rounded-lg hover:border-primary/50 hover:bg-primary/5 transition-colors"
+                    >
+                      <Plus className="h-4 w-4 text-muted-foreground" />
+                      <span className="text-sm text-muted-foreground">Add {label.toLowerCase()}</span>
+                    </button>
+                  )}
+                </CardContent>
+              </Card>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Calendar Grid (desktop) */}
+      <div className="hidden md:grid grid-cols-8 gap-4">
         {/* Time slots header */}
         <div className="space-y-4">
           <div className="h-12"></div> {/* Spacer for date headers */}

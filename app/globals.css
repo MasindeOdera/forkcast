@@ -139,3 +139,12 @@ code {
     @apply bg-background text-foreground;
     }
 }
+
+/* Hide scrollbar for day picker on mobile weekly planner */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
