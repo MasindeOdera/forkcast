@@ -78,8 +78,32 @@ create unique index if not exists meal_plans_unique_per_day
 -- ---------------------------------------------------------------------------
 -- Row Level Security
 -- ---------------------------------------------------------------------------
--- We access these tables from the server with the service role key, which
--- bypasses RLS. Leaving RLS OFF is fine for the current architecture.
--- See docs/services/supabase.md → "Row Level Security" before turning it on.
+-- Forkcast's server accesses these tables with the SUPABASE_SERVICE_ROLE_KEY,
+-- which bypasses RLS. But NEXT_PUBLIC_SUPABASE_ANON_KEY ships in the browser
+-- bundle, and without RLS anyone could hit PostgREST with that anon key and
+-- read every row (including users.password bcrypt hashes).
+--
+-- We therefore enable + FORCE RLS on all three tables with NO permissive
+-- policies (default-deny). The server keeps working; anon/authenticated get
+-- zero rows. If you ever wire the anon key up to browser queries, add
+-- scoped CREATE POLICY statements below, keyed off auth.uid().
+--
+-- See docs/services/supabase.md → "Row Level Security" for the reasoning.
+
+alter table public.users       enable row level security;
+alter table public.users       force  row level security;
+
+alter table public.meals       enable row level security;
+alter table public.meals       force  row level security;
+
+alter table public.meal_plans  enable row level security;
+alter table public.meal_plans  force  row level security;
+
+-- Extra hardening: revoke direct-table privileges from the two PostgREST
+-- roles the anon key and any authenticated JWT can assume. Belt-and-
+-- suspenders vs RLS. service_role keeps full access.
+revoke all on public.users       from anon, authenticated;
+revoke all on public.meals       from anon, authenticated;
+revoke all on public.meal_plans  from anon, authenticated;
 
 -- End of schema.

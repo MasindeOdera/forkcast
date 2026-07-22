@@ -15,7 +15,7 @@ We use the **service role key** on the server (inside `/app/api/*` routes) to by
 
 ## How it's wired up
 
-- **Client factory**: [`/app/lib/supabase.js`](../../lib/supabase.js) and [`/app/lib/supabase-db.js`](../../lib/supabase-db.js)
+- **Client factory**: [`/app/lib/supabase-db.js`](../../lib/supabase-db.js) — a single server-only client that uses the service role key.
 - **Env vars**:
   - `NEXT_PUBLIC_SUPABASE_URL` — your project URL, e.g. `https://abcd.supabase.co`
   - `SUPABASE_SERVICE_ROLE_KEY` — full-access key, server-only
@@ -47,15 +47,28 @@ If you're cloning the repo and creating a new Supabase project (or resetting the
 
 ## 🔐 Row Level Security (RLS)
 
-Supabase turns RLS **off** by default on new tables, which is what we currently rely on — all reads and writes go through server routes that authenticate with the **service role key**, which bypasses RLS entirely.
+Forkcast uses the **service role key** on the server for every DB read/write, which bypasses RLS. But `NEXT_PUBLIC_SUPABASE_ANON_KEY` is **shipped inside the browser JS bundle** — anyone who inspects the deployed frontend can pull it, hit `<project>.supabase.co/rest/v1/…` directly, and read whatever the anon role is allowed to read. **With RLS off, that meant every row in every table, including the bcrypt password hashes in `users`.**
+
+Because of this, RLS is now **ON and forced** on `users`, `meals`, and `meal_plans`, with **no permissive policies** (default-deny). See [`/app/db/schema.sql`](../../db/schema.sql) and [`/app/db/enable_rls.sql`](../../db/enable_rls.sql).
 
 What this means in practice:
 
-- ✅ It's fine to leave RLS off for our current architecture (server-only DB access).
-- ⚠️ **Do not enable RLS on `users`, `meals`, or `meal_plans` without also writing policies** — the moment you turn it on, any query made with the anon key (browser side) is denied by default, and any code that ever switches to the anon client will silently return empty results.
-- 🛡️ If we ever expose the anon key to the browser for direct queries (e.g. Supabase realtime subscriptions), RLS becomes mandatory and each table needs explicit `SELECT` / `INSERT` / `UPDATE` / `DELETE` policies scoped by `auth.uid()`.
+- ✅ The server (service role) continues to work unchanged — service role bypasses RLS.
+- ✅ Anon and authenticated PostgREST calls get **zero rows** for these tables.
+- ✅ Even direct table SELECTs from anon/authenticated are blocked (we also `REVOKE ALL` at the role level for defense in depth).
+- ⚠️ **Do not add permissive policies without scoping them.** A blanket `USING (true)` policy re-opens the same hole.
+- 🛡️ If you ever wire the anon key up to browser queries (Supabase realtime, direct table selects, etc.), add scoped `CREATE POLICY` statements — one per action per role, keyed off `auth.uid()`.
 
-Dashboard path: **Authentication → Policies** to view/edit; **Table Editor → pick table → the RLS toggle** to enable/disable.
+### If Supabase's Security Advisor is flagging this project
+
+If **Advisors → Security** shows `rls_disabled_in_public` or `sensitive_columns_exposed`:
+
+1. Open **SQL Editor → New query**.
+2. Paste the contents of [`/app/db/enable_rls.sql`](../../db/enable_rls.sql).
+3. Click **Run**. Safe to re-run — every statement is idempotent.
+4. Refresh **Advisors → Security**; both Critical issues should clear.
+
+Dashboard path: **Authentication → Policies** to view/edit policies; **Table Editor → pick table → the RLS toggle** to view the RLS state.
 
 ## 💾 Backups & recovery
 
@@ -97,10 +110,13 @@ We ship two things that together keep the project awake:
 
 #### To enable the cron on your fork:
 1. Push the repo to GitHub.
-2. Go to **Settings → Secrets and variables → Actions** and add a secret:
-   - `HEALTHCHECK_URL` = `https://<your-deployment>/api/health`
-3. GitHub Actions must be enabled for the repo (it is by default on public repos; for private repos you may need to enable it explicitly).
-4. You can manually trigger the workflow from the **Actions** tab ("Run workflow") to verify it works.
+2. Go to **Settings → Secrets and variables → Actions → New repository secret** and add:
+   - **Name:** `HEALTHCHECK_URL`
+   - **Value:** `https://<your-deployment>/api/health` (the full URL to the deployed `/api/health` endpoint — the same URL you'd `curl` from your laptop)
+3. GitHub Actions must be enabled for the repo (default on for public repos; on private repos, check **Settings → Actions → General → "Allow all actions"**).
+4. Trigger the workflow manually to verify: **Actions tab → "Supabase Keepalive" → "Run workflow" → Run workflow**. The run should complete green in ~5s.
+5. If it fails with `HEALTHCHECK_URL secret is not set`, step 2 didn't take — re-add the secret and re-run.
+6. If it fails with `Health endpoint reports DB is not OK`, the DB is paused — click **Restore project** in the Supabase dashboard, then re-run the workflow.
 
 See [workflow/github-actions.md](../workflow/github-actions.md) for a general primer on how GitHub Actions fits into this repo.
 
