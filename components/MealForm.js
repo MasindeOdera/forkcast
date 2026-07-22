@@ -25,6 +25,7 @@ export default function MealForm({
     imageUrl: null,
     galleryImages: []
   });
+  const [formErrors, setFormErrors] = useState({});
 
   // Reset form when dialog opens/closes or initial data changes
   useEffect(() => {
@@ -53,13 +54,22 @@ export default function MealForm({
         galleryImages: []
       });
     }
+    // Whenever the dialog opens or the initial data changes, wipe out any
+    // stale validation errors from the previous session.
+    setFormErrors({});
   }, [initialData, isOpen]);
 
   const handleInputChange = (e) => {
-    setFormData({
-      ...formData,
-      [e.target.name]: e.target.value
-    });
+    const { name, value } = e.target;
+    setFormData({ ...formData, [name]: value });
+    // Clear the inline error for a field the moment the user starts fixing it.
+    if (formErrors[name]) {
+      setFormErrors((prev) => {
+        const next = { ...prev };
+        delete next[name];
+        return next;
+      });
+    }
   };
 
   const handleImageUpload = (imageUrl) => {
@@ -76,13 +86,13 @@ export default function MealForm({
     });
   };
 
-  const [formErrors, setFormErrors] = useState({});
-
   const validateForm = () => {
     const errors = {};
     
     if (!formData.title.trim()) {
       errors.title = 'Meal title is required';
+    } else if (formData.title.trim().length < 3) {
+      errors.title = 'Give your meal a name at least 3 characters long';
     }
     
     if (!formData.ingredients.trim()) {
@@ -182,11 +192,20 @@ export default function MealForm({
               value={formData.ingredients}
               onChange={handleInputChange}
               rows={6}
+              className={formErrors.ingredients ? 'border-destructive' : ''}
+              aria-invalid={!!formErrors.ingredients}
+              aria-describedby={formErrors.ingredients ? 'ingredients-error' : 'ingredients-hint'}
               required
             />
-            <p className="text-xs text-muted-foreground">
-              List each ingredient on a new line
-            </p>
+            {formErrors.ingredients ? (
+              <p id="ingredients-error" className="text-sm text-destructive">
+                {formErrors.ingredients}
+              </p>
+            ) : (
+              <p id="ingredients-hint" className="text-xs text-muted-foreground">
+                List each ingredient on a new line
+              </p>
+            )}
           </div>
 
           <div className="space-y-2">
@@ -204,11 +223,20 @@ export default function MealForm({
               value={formData.instructions}
               onChange={handleInputChange}
               rows={8}
+              className={formErrors.instructions ? 'border-destructive' : ''}
+              aria-invalid={!!formErrors.instructions}
+              aria-describedby={formErrors.instructions ? 'instructions-error' : 'instructions-hint'}
               required
             />
-            <p className="text-xs text-muted-foreground">
-              Write clear, step-by-step instructions. No need to number steps - just separate each step with a line break.
-            </p>
+            {formErrors.instructions ? (
+              <p id="instructions-error" className="text-sm text-destructive">
+                {formErrors.instructions}
+              </p>
+            ) : (
+              <p id="instructions-hint" className="text-xs text-muted-foreground">
+                Write clear, step-by-step instructions. No need to number steps - just separate each step with a line break.
+              </p>
+            )}
           </div>
 
           <div className="flex gap-3 pt-4">

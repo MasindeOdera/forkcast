@@ -1,29 +1,31 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { 
-  DropdownMenu, 
-  DropdownMenuContent, 
-  DropdownMenuItem, 
-  DropdownMenuSeparator, 
-  DropdownMenuTrigger 
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { 
-  Plus, 
-  Search, 
-  User, 
-  LogOut, 
-  ChefHat, 
-  Users, 
+import {
+  Plus,
+  Search,
+  LogOut,
+  ChefHat,
+  Users,
   Loader2,
   UtensilsCrossed,
   RefreshCw,
-  Sparkles
+  Sparkles,
+  AlertTriangle,
+  CalendarDays,
+  Trash2,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -31,23 +33,43 @@ import AuthForm from '@/components/AuthForm';
 import MealCard from '@/components/MealCard';
 import MealForm from '@/components/MealForm';
 import MealSuggestions from '@/components/MealSuggestions';
+import { EmptyState } from '@/components/ui/empty-state';
+import { MealCardGrid } from '@/components/ui/meal-card-skeleton';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
+import { apiGet, apiPost, apiPut, apiDelete } from '@/lib/api-client';
 
 export default function App() {
+  // ─── Auth state ─────────────────────────────────────────────────────
   const [user, setUser] = useState(null);
+  const [authLoading, setAuthLoading] = useState(true);
+
+  // ─── Data state ─────────────────────────────────────────────────────
   const [meals, setMeals] = useState([]);
   const [myMeals, setMyMeals] = useState([]);
-  const [loading, setLoading] = useState(true);
+
+  // Fine-grained request-status: 'idle' | 'loading' | 'success' | 'error'.
+  // Distinguishing these unlocks: skeleton on first load, cached data +
+  // subtle refresh spinner on subsequent loads, and a proper error card
+  // (with a "Try again" CTA) when the fetch actually failed.
+  const [mealsStatus, setMealsStatus] = useState('idle');
+  const [mealsError, setMealsError] = useState(null);
+
+  // UI state
   const [searchQuery, setSearchQuery] = useState('');
   const [activeTab, setActiveTab] = useState('discover');
   const [showMealForm, setShowMealForm] = useState(false);
   const [editingMeal, setEditingMeal] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Check for existing authentication on mount
+  // Delete-confirmation dialog state (replaces window.confirm).
+  const [pendingDelete, setPendingDelete] = useState(null); // { meal } | null
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  // ─── Bootstrap from localStorage ────────────────────────────────────
   useEffect(() => {
     const token = localStorage.getItem('forkcast_token');
     const userData = localStorage.getItem('forkcast_user');
-    
+
     if (token && userData) {
       try {
         setUser(JSON.parse(userData));
@@ -57,50 +79,69 @@ export default function App() {
         localStorage.removeItem('forkcast_user');
       }
     }
-    
-    setLoading(false);
+
+    setAuthLoading(false);
   }, []);
 
-  // Load meals when user changes or tab changes
+  // ─── Session-expired handler ────────────────────────────────────────
+  // Called from any request that comes back with SESSION_EXPIRED. Clears
+  // credentials, drops the user back to the login form, and shows ONE
+  // clear toast (previous behaviour was to silently render an empty list).
+  const handleSessionExpired = useCallback(() => {
+    localStorage.removeItem('forkcast_token');
+    localStorage.removeItem('forkcast_user');
+    setUser(null);
+    setMeals([]);
+    setMyMeals([]);
+    setMealsStatus('idle');
+    setMealsError(null);
+    toast.error('Your session has expired. Please log in again.');
+  }, []);
+
+  // ─── Meals loader ───────────────────────────────────────────────────
+  // `isRefresh=true` means "we already have data on screen, just refetch
+  // quietly" (no skeleton flash). `isRefresh=false` means "first load, show
+  // skeletons".
+  const loadMeals = useCallback(
+    async (isRefresh = false) => {
+      if (!user) return;
+
+      setMealsStatus(isRefresh ? 'success' : 'loading');
+      setMealsError(null);
+
+      const [allRes, mineRes] = await Promise.all([
+        apiGet('/api/meals'),
+        apiGet(`/api/meals?userId=${encodeURIComponent(user.id)}`),
+      ]);
+
+      // Any 401 from either call → session expired flow, stop here.
+      if (allRes.error?.code === 'SESSION_EXPIRED' || mineRes.error?.code === 'SESSION_EXPIRED') {
+        handleSessionExpired();
+        return;
+      }
+
+      if (!allRes.ok || !mineRes.ok) {
+        const err = allRes.error || mineRes.error;
+        setMealsStatus('error');
+        setMealsError(err);
+        // Only toast on a *refresh* failure — on first-load failure the
+        // inline error card is the primary signal, so we don't double-up.
+        if (isRefresh) toast.error(err?.message || 'Failed to refresh meals.');
+        return;
+      }
+
+      setMeals(Array.isArray(allRes.data) ? allRes.data : []);
+      setMyMeals(Array.isArray(mineRes.data) ? mineRes.data : []);
+      setMealsStatus('success');
+    },
+    [user, handleSessionExpired]
+  );
+
   useEffect(() => {
-    if (user) {
-      loadMeals();
-    }
-  }, [user, activeTab]);
+    if (user) loadMeals(false);
+  }, [user, loadMeals]);
 
-  const loadMeals = async () => {
-    try {
-      const token = localStorage.getItem('forkcast_token');
-      
-      // Load all meals for discovery
-      const allMealsResponse = await fetch('/api/meals', {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
-      
-      if (allMealsResponse.ok) {
-        const allMealsData = await allMealsResponse.json();
-        setMeals(allMealsData);
-      }
-
-      // Load user's own meals
-      const myMealsResponse = await fetch(`/api/meals?userId=${user.id}`, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
-      
-      if (myMealsResponse.ok) {
-        const myMealsData = await myMealsResponse.json();
-        setMyMeals(myMealsData);
-      }
-    } catch (error) {
-      console.error('Error loading meals:', error);
-      toast.error('Failed to load meals');
-    }
-  };
-
+  // ─── Handlers ───────────────────────────────────────────────────────
   const handleAuthSuccess = (userData) => {
     setUser(userData);
     toast.success(`Welcome ${userData.username}!`);
@@ -112,61 +153,36 @@ export default function App() {
     setUser(null);
     setMeals([]);
     setMyMeals([]);
+    setMealsStatus('idle');
+    setMealsError(null);
     toast.success('Logged out successfully');
   };
 
   const handleMealSubmit = async (formData) => {
     setIsSubmitting(true);
-    
     try {
-      const token = localStorage.getItem('forkcast_token');
-      const url = editingMeal ? `/api/meals/${editingMeal.id}` : '/api/meals';
-      const method = editingMeal ? 'PUT' : 'POST';
-      
-      const response = await fetch(url, {
-        method,
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify(formData)
-      });
+      const res = editingMeal
+        ? await apiPut(`/api/meals/${editingMeal.id}`, formData)
+        : await apiPost('/api/meals', formData);
 
-      // Check if response is JSON
-      const contentType = response.headers.get('content-type');
-      let errorData;
-      
-      if (contentType && contentType.includes('application/json')) {
-        errorData = await response.json();
-      } else {
-        // If it's not JSON, it might be an HTML error page
-        const textResponse = await response.text();
-        console.error('Non-JSON response:', textResponse);
-        throw new Error('Server returned an unexpected response. Please try again.');
+      if (res.error?.code === 'SESSION_EXPIRED') {
+        handleSessionExpired();
+        return;
       }
 
-      if (!response.ok) {
-        if (errorData.details && Array.isArray(errorData.details)) {
-          throw new Error(`${errorData.error}\n• ${errorData.details.join('\n• ')}`);
+      if (!res.ok) {
+        // Server-side validation errors come back as { error, details: [] }.
+        if (res.data?.details && Array.isArray(res.data.details)) {
+          throw new Error(`${res.data.error}\n• ${res.data.details.join('\n• ')}`);
         }
-        throw new Error(errorData.error || 'Failed to save meal');
+        throw new Error(res.error?.message || 'Failed to save meal.');
       }
 
-      const savedMeal = errorData; // It's actually the saved meal data
-      
-      toast.success(editingMeal ? 'Meal updated successfully! 🎉' : 'Meal created successfully! 🎉');
-      
-      // Refresh meals
-      await loadMeals();
-      
-      // Close form and reset editing state
+      toast.success(editingMeal ? 'Meal updated! 🎉' : 'Meal created! 🎉');
+      await loadMeals(true);
       setShowMealForm(false);
       setEditingMeal(null);
-      
-      // Switch to My Meals tab if creating new meal
-      if (!editingMeal) {
-        setActiveTab('my-meals');
-      }
+      if (!editingMeal) setActiveTab('my-meals');
     } catch (error) {
       console.error('Error saving meal:', error);
       toast.error(error.message);
@@ -180,79 +196,77 @@ export default function App() {
     setShowMealForm(true);
   };
 
-  const handleDeleteMeal = async (meal) => {
-    if (!confirm('Are you sure you want to delete this meal?')) {
-      return;
-    }
+  // Delete now opens a proper confirm dialog instead of native confirm().
+  const handleDeleteMeal = (meal) => {
+    setPendingDelete({ meal });
+  };
 
+  const confirmDeleteMeal = async () => {
+    if (!pendingDelete) return;
+    const { meal } = pendingDelete;
+    setIsDeleting(true);
     try {
-      const token = localStorage.getItem('forkcast_token');
-      const response = await fetch(`/api/meals/${meal.id}`, {
-        method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to delete meal');
+      const res = await apiDelete(`/api/meals/${meal.id}`);
+      if (res.error?.code === 'SESSION_EXPIRED') {
+        handleSessionExpired();
+        return;
       }
-
-      toast.success('Meal deleted successfully');
-      await loadMeals();
+      if (!res.ok) {
+        throw new Error(res.error?.message || 'Failed to delete meal.');
+      }
+      toast.success('Meal deleted');
+      await loadMeals(true);
+      setPendingDelete(null);
     } catch (error) {
       console.error('Error deleting meal:', error);
       toast.error(error.message);
+    } finally {
+      setIsDeleting(false);
     }
   };
 
   const handleAddToMealPlan = async (meal) => {
-    try {
-      const token = localStorage.getItem('forkcast_token');
-      const response = await fetch('/api/meals', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({
-          title: `${meal.title} (from ${meal.user?.username})`,
-          ingredients: meal.ingredients,
-          instructions: meal.instructions,
-          imageUrl: meal.imageUrl,
-          galleryImages: meal.galleryImages || []
-        })
-      });
+    const res = await apiPost('/api/meals', {
+      title: `${meal.title} (from ${meal.user?.username})`,
+      ingredients: meal.ingredients,
+      instructions: meal.instructions,
+      imageUrl: meal.imageUrl,
+      galleryImages: meal.galleryImages || [],
+    });
 
-      if (response.ok) {
-        toast.success(`"${meal.title}" copied to your collection! 🎉`);
-        // Refresh meals
-        await loadMeals();
-      } else {
-        throw new Error('Failed to copy meal');
-      }
-    } catch (error) {
-      console.error('Error copying meal:', error);
-      toast.error('Failed to copy meal. Please try again.');
+    if (res.error?.code === 'SESSION_EXPIRED') {
+      handleSessionExpired();
+      return;
     }
+
+    if (!res.ok) {
+      toast.error(res.error?.message || 'Failed to copy meal. Please try again.');
+      return;
+    }
+
+    toast.success(`"${meal.title}" copied to your collection! 🎉`);
+    await loadMeals(true);
   };
 
-  const filteredMeals = meals.filter(meal =>
-    meal.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    meal.ingredients.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    meal.user?.username.toLowerCase().includes(searchQuery.toLowerCase())
+  // ─── Derived data ───────────────────────────────────────────────────
+  const filteredMeals = meals.filter(
+    (meal) =>
+      meal.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      meal.ingredients.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      meal.user?.username.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const filteredMyMeals = myMeals.filter(meal =>
-    meal.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    meal.ingredients.toLowerCase().includes(searchQuery.toLowerCase())
+  const filteredMyMeals = myMeals.filter(
+    (meal) =>
+      meal.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      meal.ingredients.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  if (loading) {
+  // ─── Render ─────────────────────────────────────────────────────────
+  if (authLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <Loader2 className="h-8 w-8 animate-spin" />
+        <Loader2 className="h-8 w-8 animate-spin text-primary" aria-label="Loading" />
       </div>
     );
   }
@@ -260,6 +274,85 @@ export default function App() {
   if (!user) {
     return <AuthForm onAuthSuccess={handleAuthSuccess} />;
   }
+
+  // A tiny renderer that picks the right state (loading / error / empty /
+  // populated) for a meal list. Keeps the JSX below tight.
+  const renderMealSection = ({ items, isMine, searchActive }) => {
+    // First-time load: full skeleton grid.
+    if (mealsStatus === 'loading') {
+      return <MealCardGrid count={6} />;
+    }
+
+    // Fetch failed and we have nothing to show → prominent error card.
+    if (mealsStatus === 'error' && meals.length === 0 && myMeals.length === 0) {
+      return (
+        <EmptyState
+          variant="error"
+          icon={AlertTriangle}
+          title="We couldn't load your meals"
+          description={
+            mealsError?.message ||
+            'Something went wrong on our end. Please try again in a moment.'
+          }
+          action={{
+            label: 'Try again',
+            icon: RefreshCw,
+            onClick: () => loadMeals(false),
+          }}
+        />
+      );
+    }
+
+    // Empty (either no data at all, or search filtered everything out).
+    if (items.length === 0) {
+      if (searchActive) {
+        return (
+          <EmptyState
+            icon={Search}
+            title="No matches"
+            description={`No meals match "${searchQuery}". Try a different search term.`}
+            action={{ label: 'Clear search', onClick: () => setSearchQuery('') }}
+          />
+        );
+      }
+      return (
+        <EmptyState
+          icon={isMine ? ChefHat : UtensilsCrossed}
+          title={isMine ? 'No meals yet' : 'No meals found'}
+          description={
+            isMine
+              ? 'Start building your recipe collection — your creations will show up here.'
+              : 'Nobody has shared a meal yet. Be the first!'
+          }
+          action={{
+            label: isMine ? 'Create your first meal' : 'Add your first meal',
+            icon: Plus,
+            onClick: () => {
+              setEditingMeal(null);
+              setShowMealForm(true);
+            },
+          }}
+        />
+      );
+    }
+
+    return (
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {items.map((meal) => (
+          <MealCard
+            key={meal.id}
+            meal={meal}
+            currentUserId={user.id}
+            onEdit={handleEditMeal}
+            onDelete={handleDeleteMeal}
+            onAddToMealPlan={handleAddToMealPlan}
+          />
+        ))}
+      </div>
+    );
+  };
+
+  const isRefreshing = mealsStatus === 'loading' && meals.length + myMeals.length > 0;
 
   return (
     <div className="min-h-screen bg-background">
@@ -305,8 +398,10 @@ export default function App() {
                   </div>
                 </div>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={loadMeals}>
-                  <RefreshCw className="mr-2 h-4 w-4" />
+                <DropdownMenuItem onClick={() => loadMeals(true)} disabled={mealsStatus === 'loading'}>
+                  <RefreshCw
+                    className={`mr-2 h-4 w-4 ${mealsStatus === 'loading' ? 'animate-spin' : ''}`}
+                  />
                   Refresh
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
@@ -334,6 +429,35 @@ export default function App() {
             />
           </div>
 
+          {/* Refresh indicator when refetching over existing data */}
+          {isRefreshing && (
+            <div
+              className="flex items-center gap-2 text-xs text-muted-foreground"
+              role="status"
+              aria-live="polite"
+            >
+              <Loader2 className="h-3 w-3 animate-spin" />
+              Refreshing meals…
+            </div>
+          )}
+
+          {/* Non-blocking error banner: we have data but the last refresh failed. */}
+          {mealsStatus === 'error' && (meals.length > 0 || myMeals.length > 0) && (
+            <div
+              role="alert"
+              className="flex items-center justify-between gap-3 rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-2 text-sm"
+            >
+              <div className="flex items-center gap-2 text-destructive">
+                <AlertTriangle className="h-4 w-4" aria-hidden="true" />
+                <span>{mealsError?.message || 'Refresh failed. Showing cached meals.'}</span>
+              </div>
+              <Button size="sm" variant="ghost" onClick={() => loadMeals(false)}>
+                <RefreshCw className="mr-2 h-3 w-3" />
+                Retry
+              </Button>
+            </div>
+          )}
+
           {/* Tabs */}
           <Tabs value={activeTab} onValueChange={setActiveTab}>
             <div className="flex items-center justify-between">
@@ -349,10 +473,16 @@ export default function App() {
                     {myMeals.length}
                   </Badge>
                 </TabsTrigger>
+                {/*
+                  Renamed from "AI Ideas" → "Plan" because this tab hosts
+                  both AI ideation AND the Weekly Planner (calendar). "Plan"
+                  covers both without being AI-specific.
+                */}
                 <TabsTrigger value="ai-suggestions" className="flex items-center gap-2">
-                  <Sparkles className="h-4 w-4" />
-                  <span className="hidden sm:inline">AI Ideas</span>
-                  <Badge variant="secondary" className="ml-1 bg-primary/10 text-primary">
+                  <CalendarDays className="h-4 w-4" />
+                  <span className="hidden sm:inline">Plan</span>
+                  <Badge variant="secondary" className="ml-1 bg-primary/10 text-primary gap-1">
+                    <Sparkles className="h-3 w-3" />
                     AI
                   </Badge>
                 </TabsTrigger>
@@ -371,73 +501,19 @@ export default function App() {
             </div>
 
             <TabsContent value="discover" className="space-y-6">
-              {filteredMeals.length === 0 ? (
-                <div className="text-center py-12">
-                  <UtensilsCrossed className="mx-auto h-12 w-12 text-muted-foreground" />
-                  <h3 className="mt-4 text-lg font-semibold">No meals found</h3>
-                  <p className="text-muted-foreground">
-                    {searchQuery ? 'Try adjusting your search terms' : 'Be the first to share a meal!'}
-                  </p>
-                  <Button 
-                    className="mt-4"
-                    onClick={() => {
-                      setEditingMeal(null);
-                      setShowMealForm(true);
-                    }}
-                  >
-                    <Plus className="mr-2 h-4 w-4" />
-                    Add Your First Meal
-                  </Button>
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {filteredMeals.map((meal) => (
-                    <MealCard
-                      key={meal.id}
-                      meal={meal}
-                      currentUserId={user.id}
-                      onEdit={handleEditMeal}
-                      onDelete={handleDeleteMeal}
-                      onAddToMealPlan={handleAddToMealPlan}
-                    />
-                  ))}
-                </div>
-              )}
+              {renderMealSection({
+                items: filteredMeals,
+                isMine: false,
+                searchActive: !!searchQuery,
+              })}
             </TabsContent>
 
             <TabsContent value="my-meals" className="space-y-6">
-              {filteredMyMeals.length === 0 ? (
-                <div className="text-center py-12">
-                  <ChefHat className="mx-auto h-12 w-12 text-muted-foreground" />
-                  <h3 className="mt-4 text-lg font-semibold">No meals yet</h3>
-                  <p className="text-muted-foreground">
-                    {searchQuery ? 'No meals match your search' : 'Start building your recipe collection!'}
-                  </p>
-                  <Button 
-                    className="mt-4"
-                    onClick={() => {
-                      setEditingMeal(null);
-                      setShowMealForm(true);
-                    }}
-                  >
-                    <Plus className="mr-2 h-4 w-4" />
-                    Create Your First Meal
-                  </Button>
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {filteredMyMeals.map((meal) => (
-                    <MealCard
-                      key={meal.id}
-                      meal={meal}
-                      currentUserId={user.id}
-                      onEdit={handleEditMeal}
-                      onDelete={handleDeleteMeal}
-                      onAddToMealPlan={handleAddToMealPlan}
-                    />
-                  ))}
-                </div>
-              )}
+              {renderMealSection({
+                items: filteredMyMeals,
+                isMine: true,
+                searchActive: !!searchQuery,
+              })}
             </TabsContent>
 
             <TabsContent value="ai-suggestions" className="space-y-6">
@@ -459,6 +535,31 @@ export default function App() {
         onSubmit={handleMealSubmit}
         initialData={editingMeal}
         isLoading={isSubmitting}
+      />
+
+      {/* Delete confirmation dialog (replaces window.confirm) */}
+      <ConfirmDialog
+        open={!!pendingDelete}
+        onOpenChange={(o) => {
+          if (!o && !isDeleting) setPendingDelete(null);
+        }}
+        title="Delete this meal?"
+        description={
+          pendingDelete ? (
+            <span>
+              This will permanently delete{' '}
+              <span className="font-medium text-foreground">
+                “{pendingDelete.meal.title}”
+              </span>{' '}
+              from your collection. This can't be undone.
+            </span>
+          ) : null
+        }
+        confirmLabel="Delete meal"
+        cancelLabel="Keep it"
+        destructive
+        loading={isDeleting}
+        onConfirm={confirmDeleteMeal}
       />
     </div>
   );

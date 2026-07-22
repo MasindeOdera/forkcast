@@ -30,41 +30,52 @@ export default function MealSuggestionForm({ onSuggestionsReceived }) {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
-    
+
+    // Tell the parent we're loading so it can render the skeleton.
+    onSuggestionsReceived?.({ status: 'loading', prompt: formData.prompt });
+
     try {
       const token = localStorage.getItem('forkcast_token');
       const response = await fetch('/api/meal-suggestions', {
         method: 'POST',
-        headers: { 
+        headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
+          Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({
           prompt: formData.prompt,
-          ingredients: formData.ingredients.split(',').map(i => i.trim()).filter(Boolean),
+          ingredients: formData.ingredients.split(',').map((i) => i.trim()).filter(Boolean),
           dietary: formData.dietary,
           cuisine: formData.cuisine,
-          mealType: formData.mealType
-        })
+          mealType: formData.mealType,
+        }),
       });
-      
+
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to get suggestions');
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || 'Failed to get suggestions.');
       }
-      
+
       const data = await response.json();
-      onSuggestionsReceived(data.suggestions);
+      onSuggestionsReceived?.({
+        status: 'success',
+        suggestions: data.suggestions,
+        prompt: formData.prompt,
+      });
     } catch (error) {
       console.error('Error getting meal suggestions:', error);
-      onSuggestionsReceived(`Error: ${error.message}. Please try again.`);
+      onSuggestionsReceived?.({
+        status: 'error',
+        error: error.message || 'Please try again.',
+        prompt: formData.prompt,
+      });
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <Card className="w-full max-w-2xl">
+    <Card className="w-full max-w-2xl" data-suggestion-form>
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Sparkles className="h-5 w-5 text-primary" />
