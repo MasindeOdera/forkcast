@@ -6,7 +6,7 @@ import os
 from datetime import datetime
 
 # Get the base URL from environment
-BASE_URL = os.getenv('NEXT_PUBLIC_BASE_URL', 'https://weekly-mobile-update.preview.emergentagent.com')
+BASE_URL = os.getenv('NEXT_PUBLIC_BASE_URL', 'https://rls-fix-deploy-1.preview.emergentagent.com')
 API_BASE = f"{BASE_URL}/api"
 
 def test_meal_update_endpoint():
