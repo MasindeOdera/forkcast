@@ -284,10 +284,10 @@ export default function MealSuggestions() {
                     */}
                     <div
                       aria-hidden="true"
-                      className="aspect-video relative overflow-hidden bg-gradient-to-br from-primary/10 via-muted/60 to-muted flex items-center justify-center"
+                      className="aspect-video relative overflow-hidden bg-gradient-to-br from-muted via-muted/60 to-muted flex items-center justify-center"
                     >
                       <UtensilsCrossed
-                        className="h-12 w-12 text-primary/30"
+                        className="h-12 w-12 text-muted-foreground/40"
                         strokeWidth={1.5}
                       />
                       <Badge className="absolute top-2 left-2 bg-primary/10 text-primary border-none gap-1">
