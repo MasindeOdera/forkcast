@@ -36,6 +36,17 @@ yarn add @capacitor/ios @capacitor/android
 # Native plugins for the Kitchen + Sharing features:
 yarn add @capacitor-mlkit/barcode-scanning
 yarn add @capacitor-community/bluetooth-le
+
+# For the "Raw Bluetooth" peer-to-peer share (Option 2 in
+# docs/features/plan-sharing.md), you ALSO need a BLE peripheral
+# plugin. `@capacitor-community/bluetooth-le` is central-only.
+# Any plugin that registers a bridge under
+# `window.Capacitor.Plugins.BlePeripheral` will work. Options:
+#   - capacitor-blep (community, small, actively maintained)
+#   - your own custom plugin wrapping CoreBluetooth (iOS) +
+#     BluetoothGattServer (Android) with the API surface documented
+#     in docs/features/plan-sharing.md
+yarn add capacitor-blep   # OR skip if you don't need Option 2
 ```
 
 > These plugins are intentionally **not** in the committed

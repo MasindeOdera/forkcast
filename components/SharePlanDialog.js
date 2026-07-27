@@ -27,7 +27,7 @@
  * plan from another device.
  */
 
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -39,12 +39,18 @@ import { Button } from '@/components/ui/button';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
-import { Share2, QrCode, Bluetooth, ClipboardCopy, ScanLine } from 'lucide-react';
+import { Share2, QrCode, Bluetooth, ClipboardCopy, ScanLine, Loader2, Radio } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import { toast } from 'sonner';
 import BarcodeScanner from '@/components/BarcodeScanner';
 import { sharePayload } from '@/lib/native/share';
-import { isBlePeerAvailable, sendPlanViaBle } from '@/lib/native/ble';
+import {
+  isBlePeerAvailable,
+  canReceiveViaBle,
+  canSendViaBle,
+  sendPlanViaBle,
+  receivePlanViaBle,
+} from '@/lib/native/ble';
 
 /**
  * @param {object} props
@@ -56,7 +62,19 @@ import { isBlePeerAvailable, sendPlanViaBle } from '@/lib/native/ble';
 export default function SharePlanDialog({ open, onOpenChange, plan, onImport }) {
   const [transport, setTransport] = useState('native'); // 'native' | 'ble' | 'qr'
   const [scannerOpen, setScannerOpen] = useState(false);
-  const bleAvailable = isBlePeerAvailable();
+  // Direction radio in the Receive tab: 'qr' (default, all devices) or
+  // 'ble' (only when the platform can act as BLE central).
+  const [receiveMode, setReceiveMode] = useState('qr');
+  // Live BLE state \u2014 kept in refs where possible so hot state doesn't
+  // re-render the whole dialog.
+  const [bleSendState, setBleSendState] = useState(null); // null | 'advertising' | 'connected' | 'sent'
+  const [bleRecvState, setBleRecvState] = useState(null); // null | 'scanning' | 'connecting' | 'reading'
+  const bleAdvertisementRef = useRef(null);
+  const bleAbortRef = useRef(null);
+
+  const anyBle = isBlePeerAvailable();
+  const bleCanSend = canSendViaBle();
+  const bleCanReceive = canReceiveViaBle();
 
   // Compact JSON — QR codes have limited capacity, so we keep the
   // payload lean. The receiving app decodes and merges.
@@ -77,11 +95,55 @@ export default function SharePlanDialog({ open, onOpenChange, plan, onImport }) 
   };
 
   const doBleShare = async () => {
+    // If already advertising, stop.
+    if (bleAdvertisementRef.current) {
+      try { await bleAdvertisementRef.current.stop(); } catch { /* noop */ }
+      bleAdvertisementRef.current = null;
+      setBleSendState(null);
+      return;
+    }
     try {
-      await sendPlanViaBle(payloadJson);
-      toast.success('Plan sent via Bluetooth');
+      setBleSendState('advertising');
+      const handle = await sendPlanViaBle(payloadJson, {
+        onAdvertising: () => setBleSendState('advertising'),
+        onConnected:   () => setBleSendState('connected'),
+        onSent:        () => {
+          setBleSendState('sent');
+          toast.success('Plan sent via Bluetooth');
+        },
+      });
+      bleAdvertisementRef.current = handle;
     } catch (err) {
-      toast(err?.message || 'BLE peer-to-peer is not available yet.');
+      setBleSendState(null);
+      toast.error(err?.message || 'BLE peer-to-peer is not available on this device.');
+    }
+  };
+
+  const doBleReceive = async () => {
+    if (bleAbortRef.current) {
+      bleAbortRef.current.abort();
+      bleAbortRef.current = null;
+      setBleRecvState(null);
+      return;
+    }
+    try {
+      const controller = new AbortController();
+      bleAbortRef.current = controller;
+      const parsed = await receivePlanViaBle({
+        signal: controller.signal,
+        onProgress: setBleRecvState,
+      });
+      bleAbortRef.current = null;
+      setBleRecvState(null);
+      onImport?.(parsed);
+      toast.success('Plan received via Bluetooth');
+      onOpenChange?.(false);
+    } catch (err) {
+      bleAbortRef.current = null;
+      setBleRecvState(null);
+      if (!String(err?.message || '').toLowerCase().includes('abort')) {
+        toast.error(err?.message || 'BLE receive failed');
+      }
     }
   };
 
@@ -144,12 +206,12 @@ export default function SharePlanDialog({ open, onOpenChange, plan, onImport }) 
                 />
                 <TransportOption
                   value="ble"
-                  title="Raw Bluetooth (v2)"
+                  title="Raw Bluetooth"
                   icon={Bluetooth}
-                  description={bleAvailable
-                    ? 'Direct BLE peer-to-peer with another Forkcast device.'
-                    : 'Coming when the app is wrapped in Capacitor with BLE support.'}
-                  disabled={!bleAvailable}
+                  description={bleCanSend
+                    ? 'Direct BLE peer-to-peer with another Forkcast device — no internet or accounts needed.'
+                    : 'Requires a Capacitor BLE peripheral plugin (see docs/features/plan-sharing.md).'}
+                  disabled={!bleCanSend}
                 />
               </RadioGroup>
 
@@ -164,9 +226,19 @@ export default function SharePlanDialog({ open, onOpenChange, plan, onImport }) 
                     </p>
                   </div>
                 ) : transport === 'ble' ? (
-                  <Button className="w-full" onClick={doBleShare} disabled={!bleAvailable}>
-                    <Bluetooth className="h-4 w-4 mr-2" /> Send via BLE
-                  </Button>
+                  <div className="space-y-2">
+                    <Button className="w-full" onClick={doBleShare} disabled={!bleCanSend}>
+                      {bleSendState === 'advertising' && <><Radio className="h-4 w-4 mr-2 animate-pulse" /> Advertising… tap to stop</>}
+                      {bleSendState === 'connected'   && <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Peer connected — waiting for read</>}
+                      {bleSendState === 'sent'        && <><Bluetooth className="h-4 w-4 mr-2" /> Sent — tap to stop</>}
+                      {!bleSendState                  && <><Bluetooth className="h-4 w-4 mr-2" /> Start advertising via BLE</>}
+                    </Button>
+                    {bleSendState && (
+                      <p className="text-xs text-muted-foreground text-center">
+                        Ask the other device to open Forkcast → Share → Receive → <b>Bluetooth</b> and scan for you.
+                      </p>
+                    )}
+                  </div>
                 ) : (
                   <Button className="w-full" onClick={doNativeShare}>
                     <Share2 className="h-4 w-4 mr-2" /> Open share sheet
@@ -181,13 +253,36 @@ export default function SharePlanDialog({ open, onOpenChange, plan, onImport }) 
 
             {/* ---------- RECEIVE ---------- */}
             <TabsContent value="receive" className="space-y-3">
-              <p className="text-sm text-muted-foreground">
-                Scan a QR code shown by another Forkcast device to import
-                the plan.
-              </p>
-              <Button className="w-full" onClick={() => setScannerOpen(true)}>
-                <ScanLine className="h-4 w-4 mr-2" /> Scan a plan QR
-              </Button>
+              <RadioGroup value={receiveMode} onValueChange={setReceiveMode}>
+                <TransportOption
+                  value="qr"
+                  title="Scan a plan QR"
+                  icon={QrCode}
+                  description="Point your camera at a QR code shown by another Forkcast device."
+                />
+                <TransportOption
+                  value="ble"
+                  title="Receive via Bluetooth"
+                  icon={Bluetooth}
+                  description={bleCanReceive
+                    ? 'Scan for a nearby Forkcast device that’s advertising a plan.'
+                    : 'Requires a Chrome-based browser or a Capacitor-wrapped app.'}
+                  disabled={!bleCanReceive}
+                />
+              </RadioGroup>
+
+              {receiveMode === 'qr' ? (
+                <Button className="w-full" onClick={() => setScannerOpen(true)}>
+                  <ScanLine className="h-4 w-4 mr-2" /> Scan a plan QR
+                </Button>
+              ) : (
+                <Button className="w-full" onClick={doBleReceive} disabled={!bleCanReceive}>
+                  {bleRecvState === 'scanning'   && <><Radio className="h-4 w-4 mr-2 animate-pulse" /> Scanning… tap to stop</>}
+                  {bleRecvState === 'connecting' && <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Connecting…</>}
+                  {bleRecvState === 'reading'    && <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Reading plan…</>}
+                  {!bleRecvState                 && <><Bluetooth className="h-4 w-4 mr-2" /> Start scanning</>}
+                </Button>
+              )}
             </TabsContent>
           </Tabs>
         </DialogContent>

@@ -24,13 +24,65 @@ which uses the same Bluetooth + WiFi Direct combo.
 > This is the recommended path. It works today, requires zero custom
 > code, and users already know how to use it.
 
-### 2. Raw Bluetooth (v2)
+### 2. Raw Bluetooth (peer-to-peer)
 
-Direct BLE peer-to-peer between two Forkcast devices. Not implemented
-in v1 because browsers cannot advertise as BLE peripherals. Once the
-app is wrapped in Capacitor (see `docs/native/capacitor-setup.md`) and
-the `@capacitor-community/bluetooth-le` plugin is installed, this
-toggle unlocks. Implementation shape is stubbed in `lib/native/ble.js`.
+Direct BLE transfer between two Forkcast devices, no internet needed
+and no accounts required on the receiving device. Uses a well-known
+GATT service:
+
+| Item                          | UUID                                       |
+|-------------------------------|--------------------------------------------|
+| Service                       | `0000f0cc-0000-1000-8000-00805f9b34fb`     |
+| Plan characteristic (read)    | `0000f0cd-0000-1000-8000-00805f9b34fb`     |
+| Advertised local name         | `Forkcast-Plan`                            |
+
+Implemented in `lib/native/ble.js`.
+
+**Sender side (peripheral)** — requires a Capacitor plugin that exposes
+a peripheral bridge under `window.Capacitor.Plugins.BlePeripheral`. The
+implementation calls the following API surface:
+
+```ts
+BlePeripheral.addService({
+  service: FORKCAST_SERVICE_UUID,
+  characteristics: [{
+    uuid: FORKCAST_PLAN_CHARACTERISTIC,
+    properties: { read: true },
+    value: <base64 plan JSON>,
+    initialValue: <base64 plan JSON>,
+  }]
+});
+BlePeripheral.startAdvertising({
+  localName: 'Forkcast-Plan',
+  serviceUuids: [FORKCAST_SERVICE_UUID],
+});
+// optional listeners: 'centralConnected', 'characteristicRead'
+BlePeripheral.stopAdvertising();
+```
+
+Any plugin conforming to this shape will work. If no peripheral plugin
+is present, the send-side throws a descriptive error and the UI keeps
+the option disabled.
+
+**Receiver side (central)** — works on:
+
+- **Capacitor (iOS + Android)** via `@capacitor-community/bluetooth-le`
+- **Chrome / Edge on desktop or Android** via Web Bluetooth
+
+Flow: `initialize → requestLEScan({ services: [SERVICE_UUID] }) →
+connect(deviceId) → read(service, char) → JSON.parse → disconnect`.
+Scan times out after 15 s by default and can be cancelled via
+`AbortSignal`.
+
+**Payload limits.** We cap the payload at 4 KB — well above what any
+realistic week plan needs — and append the ASCII record-separator
+`\x1e` as a terminator so we can trim padding safely on the receiver.
+Anything bigger falls back to the Share Sheet.
+
+**Why not `@capacitor-community/bluetooth-le` for BOTH sides?** It's
+central-only. Peripheral / GATT-server mode isn't in its API. That's
+why the send side needs a separate peripheral plugin. See
+`docs/native/capacitor-setup.md` for compatible peripheral plugins.
 
 ### 3. QR code (always available)
 

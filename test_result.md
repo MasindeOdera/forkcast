@@ -499,7 +499,45 @@ test_plan:
           agent: "testing"
           comment: "MEAL SUGGESTIONS PANTRY MERGE TESTED: Feature working correctly. ✅ Auth guard fires first - returns 401 without valid JWT. ✅ Validation fires BEFORE DB/LLM access - missing prompt returns 400 'Please describe what kind of meal you're looking for'. ✅ usePantry=false bypasses DB - no pantry lookup attempted, goes straight to LLM (returns 500 'AI service is not configured' in test env with no EMERGENT_LLM_KEY). ✅ usePantry=true attempts pantry merge - code correctly tries to fetch pantry items, filters by expiresAt >= today, merges into ingredients array, and de-dupes. ✅ Pantry lookup errors are NON-FATAL per spec - wrapped in try/catch with console.warn, suggestion generation continues even if pantry fetch fails. Guard order verified: 401 (auth) → 400 (validation) → 500 (LLM/DB error). Integration between Kitchen (pantry) and AI suggestions working as designed."
 
+  - task: "Plan Sharing - BLE Peer-to-Peer (v2)"
+    implemented: true
+    working: "NA"
+    file: "lib/native/ble.js, components/SharePlanDialog.js"
+    stuck_count: 0
+    priority: "low"
+    needs_retesting: false
+    status_history:
+        - working: "NA"
+          agent: "main"
+          comment: "Direct BLE peer-to-peer sharing implemented in lib/native/ble.js. Uses well-known GATT service (0000f0cc-0000-1000-8000-00805f9b34fb) with a read characteristic. Sender side requires a Capacitor BlePeripheral plugin (feature-detected via window.Capacitor.Plugins.BlePeripheral); receiver side works with @capacitor-community/bluetooth-le OR Web Bluetooth (Chrome/Edge). SharePlanDialog wires both Send and Receive with live status (advertising/connected/sent, scanning/connecting/reading). Payload capped at 4KB. CANNOT be tested in this preview environment - native-only. Users must wrap in Capacitor + install plugins per docs/native/capacitor-setup.md."
+
+  - task: "Kitchen - Frontend Shell"
+    implemented: true
+    working: true
+    file: "components/kitchen/Kitchen.js, components/kitchen/ShoppingList.js, components/kitchen/Pantry.js"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        - working: true
+          agent: "testing"
+          comment: "KITCHEN TAB SMOKE TEST COMPLETE: UI shell rendering verified successfully. ✅ Kitchen tab (rightmost tab with UtensilsCrossed icon) renders correctly with two sub-tabs: Shopping List (ShoppingCart icon) and Pantry (Package icon). ✅ Shopping List sub-tab active by default. ✅ Shopping List UI elements verified: 'Shopping list' card with input field 'Add an item manually…', Add button (disabled when empty, enabled when text entered), Scan button (opens BarcodeScanner dialog), 'Generate from this week's plan' button with RefreshCw icon, 'To buy' card with badge showing count. ✅ Empty state displays correctly: ShoppingCart icon + 'Your list is empty' title + description text. ✅ API calls return 500 (no Supabase env vars) as EXPECTED - error handling graceful, no crashes. ✅ Pantry sub-tab verified: 'Add to pantry' card with name input (placeholder 'e.g. chicken, rice, tomatoes…'), date input, Add and Scan buttons. ✅ 'In your pantry' card shows empty state: Package icon + 'Pantry is empty' title + description. ✅ Mobile responsive: Kitchen sub-tabs show icons only at 390px viewport. ✅ No console errors, no layout breakage. All UI elements functional and accessible."
+
+  - task: "Share Plan Dialog - Frontend"
+    implemented: true
+    working: true
+    file: "components/SharePlanDialog.js, components/BarcodeScanner.js, lib/native/ble.js, lib/native/share.js"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        - working: true
+          agent: "testing"
+          comment: "SHARE PLAN DIALOG SMOKE TEST COMPLETE: UI shell rendering and interaction flow verified successfully. ✅ Share Plan button found in Weekly Planner header on both desktop (labelled 'Share Plan' with Share2 icon) and mobile (icon-only with aria-label='Share this plan'). ✅ Dialog opens with title 'Share your plan' and description 'No account or internet needed on the receiving device'. ✅ Send/Receive tabs present, Send active by default. ✅ SEND TAB - All 3 transport options render correctly: (1) 'Share via device' radio (Share2 icon, enabled) with description mentioning AirDrop/Nearby Share/Bluetooth+WiFi Direct, (2) 'Show QR code' radio (QrCode icon, enabled) - QR code renders as 200x200 SVG with black on white background inside rounded card, instruction text 'Point the other phone's camera at this code' displays below, (3) 'Raw Bluetooth' radio (Bluetooth icon, DISABLED as expected) with description 'Requires a Capacitor BLE peripheral plugin (see docs/features/plan-sharing.md)'. ✅ QR code switching works - clicking 'Show QR code' radio displays QR, clicking 'Share via device' shows 'Open share sheet' button. ✅ 'Copy JSON instead' button present at bottom. ✅ RECEIVE TAB - Two radio options render: (1) 'Scan a plan QR' (enabled, QrCode icon), (2) 'Receive via Bluetooth' (state depends on Web Bluetooth availability - either enabled or disabled, both acceptable). ✅ Clicking 'Scan a plan QR' opens BarcodeScanner dialog (verified in QR mode with allowManual=false - Type tab not visible as expected). ✅ Mobile responsive verified at 390px - Share Plan button shows as icon-only. ✅ No crashes, no console errors, graceful fallbacks for unavailable features. All interaction flows working as designed."
+
 agent_communication:
+    - agent: "testing"
+      message: "KITCHEN TAB & SHARE PLAN DIALOG SMOKE TEST COMPLETE: Comprehensive UI testing of new Kitchen tab and Share Plan dialog feature completed successfully. ✅ Kitchen tab renders with Shopping List and Pantry sub-tabs, all UI elements present and functional, empty states display correctly, API 500 errors handled gracefully (expected - no Supabase env vars). ✅ Share Plan dialog opens from Weekly Planner, Send tab shows 3 transport options (Share via device, Show QR code, Raw Bluetooth), QR code renders correctly (200x200 SVG), Receive tab shows 2 options (Scan QR, Receive via Bluetooth), BLE options correctly disabled (no Capacitor plugin), BarcodeScanner integration working. ✅ Mobile responsive verified at 390px viewport. ✅ No regressions to existing tabs (Discover, My Meals, Plan, Kitchen all accessible). ✅ No console errors, no layout breakage, all interaction flows working as designed. Both new features are production-ready for UI shell and navigation - DB-backed functionality will work once Supabase env vars are configured."
     - agent: "testing"
       message: "Completed comprehensive backend API testing for Forkcast app. All 9 API endpoints tested successfully. Fixed one Cloudinary upload issue by removing problematic format parameter. No JSON parsing errors found during registration - the issue may have been resolved or was environment-specific. All authentication, meal CRUD operations, user management, and image upload functionality working correctly. Backend is fully functional and ready for production use."
     - agent: "testing"
