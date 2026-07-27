@@ -27,6 +27,7 @@ import {
   Sparkles,
   AlertTriangle,
   RefreshCw,
+  UtensilsCrossed,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import MealSuggestionForm from './MealSuggestionForm';
@@ -193,7 +194,9 @@ export default function MealSuggestions() {
       </div>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {Array.from({ length: 3 }).map((_, i) => (
-          <Card key={i} className="border-primary/20">
+          <Card key={i} className="border-primary/20 overflow-hidden">
+            {/* Matches the placeholder image slot on real AI cards */}
+            <Skeleton className="aspect-video w-full rounded-none" />
             <CardHeader className="pb-2 space-y-2">
               <Skeleton className="h-4 w-2/3" />
             </CardHeader>
@@ -267,15 +270,33 @@ export default function MealSuggestions() {
                 {parsedMeals.map((meal) => (
                   <Card
                     key={meal.id}
-                    className="cursor-grab hover:shadow-lg transition-shadow border-primary/20"
+                    className="cursor-grab hover:shadow-lg transition-shadow border-primary/20 overflow-hidden"
                     draggable="true"
                     onDragStart={(e) => handleDragStart(e, meal)}
                   >
+                    {/*
+                      Same placeholder treatment as MealCard so AI cards
+                      match the anatomy of user-created cards: image slot
+                      on top, then header, then content. The AI badge is
+                      overlaid on the placeholder (mirroring the "gallery
+                      count" badge on real cards) to keep the title row
+                      clean.
+                    */}
+                    <div
+                      aria-hidden="true"
+                      className="aspect-video relative overflow-hidden bg-gradient-to-br from-primary/10 via-muted/60 to-muted flex items-center justify-center"
+                    >
+                      <UtensilsCrossed
+                        className="h-12 w-12 text-primary/30"
+                        strokeWidth={1.5}
+                      />
+                      <Badge className="absolute top-2 left-2 bg-primary/10 text-primary border-none gap-1">
+                        <Sparkles className="h-3 w-3" />
+                        AI
+                      </Badge>
+                    </div>
                     <CardHeader className="pb-2">
-                      <CardTitle className="text-base flex items-center gap-2">
-                        <Badge variant="secondary" className="bg-primary/10 text-primary text-xs">
-                          AI
-                        </Badge>
+                      <CardTitle className="text-base">
                         {meal.title}
                       </CardTitle>
                     </CardHeader>
