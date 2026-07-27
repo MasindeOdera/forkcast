@@ -125,7 +125,13 @@ create table if not exists public.pantry_items (
 create index if not exists pantry_items_user_id_idx    on public.pantry_items (user_id);
 create index if not exists pantry_items_expires_at_idx on public.pantry_items (expires_at)
     where expires_at is not null;
-create index if not exists pantry_items_name_trgm_idx  on public.pantry_items using gin (name gin_trgm_ops);
+do $$
+begin
+    if exists (select 1 from pg_extension where extname = 'pg_trgm') then
+        create index if not exists pantry_items_name_trgm_idx on public.pantry_items
+            using gin (name gin_trgm_ops);
+    end if;
+end $$;
 
 -- shopping_list_items: what the user still needs to buy. source_meal_id
 -- lets us trace an item back to the recipe that added it (nullable for

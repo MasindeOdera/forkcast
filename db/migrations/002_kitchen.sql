@@ -12,6 +12,15 @@
 -- docs/operations/database-schema.md for the full schema map.
 
 -- ---------------------------------------------------------------------------
+-- Required Postgres extensions
+-- ---------------------------------------------------------------------------
+-- pg_trgm powers the trigram index we build on pantry_items.name below.
+-- Idempotent — no-op if already enabled by db/schema.sql. Included here
+-- so this migration is self-contained (Supabase projects created before
+-- the trigram indexes existed may not have this extension enabled yet).
+create extension if not exists pg_trgm;
+
+-- ---------------------------------------------------------------------------
 -- pantry_items
 -- ---------------------------------------------------------------------------
 -- One row per ingredient the user has stocked. Barcode is nullable because
@@ -32,10 +41,20 @@ create index if not exists pantry_items_user_id_idx    on public.pantry_items (u
 create index if not exists pantry_items_expires_at_idx on public.pantry_items (expires_at)
     where expires_at is not null;
 
--- Trigram index so the AI-Ideas prompt can quickly fuzzy-match pantry names
--- against recipe ingredients client-side, and so future search stays cheap.
-create index if not exists pantry_items_name_trgm_idx on public.pantry_items
-    using gin (name gin_trgm_ops);
+-- Trigram index so future fuzzy-search on pantry names stays cheap.
+-- Wrapped in a DO block so the whole migration still succeeds even if
+-- pg_trgm can't be created on this instance for any reason (e.g.
+-- restricted permissions on a hosted plan). The index is a nice-to-
+-- have, not a correctness requirement.
+do $$
+begin
+    if exists (select 1 from pg_extension where extname = 'pg_trgm') then
+        create index if not exists pantry_items_name_trgm_idx on public.pantry_items
+            using gin (name gin_trgm_ops);
+    else
+        raise notice 'pg_trgm not installed; skipping pantry_items_name_trgm_idx';
+    end if;
+end $$;
 
 -- ---------------------------------------------------------------------------
 -- shopping_list_items
