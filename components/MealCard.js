@@ -7,7 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { User, Clock, ChefHat, Eye, Edit, Trash2, ChevronLeft, ChevronRight, Images, Plus } from 'lucide-react';
+import { User, Clock, ChefHat, Eye, Edit, Trash2, ChevronLeft, ChevronRight, Images, Plus, UtensilsCrossed } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 
 export default function MealCard({ meal, currentUserId, onEdit, onDelete, onAddToMealPlan }) {
@@ -50,7 +50,7 @@ export default function MealCard({ meal, currentUserId, onEdit, onDelete, onAddT
   return (
     <Card className="overflow-hidden hover:shadow-lg transition-shadow">
       {/* Image Section with Gallery Navigation */}
-      {allImages.length > 0 && (
+      {allImages.length > 0 ? (
         <div className="aspect-video relative overflow-hidden group">
           <img
             src={allImages[currentImageIndex]}
@@ -93,6 +93,19 @@ export default function MealCard({ meal, currentUserId, onEdit, onDelete, onAddT
               {allImages.length}
             </Badge>
           )}
+        </div>
+      ) : (
+        /*
+          Placeholder image slot — keeps every meal card the same shape
+          even when no photo has been uploaded. Uses a soft gradient +
+          centered utensils icon so it reads as "meal card, no photo yet"
+          rather than looking broken.
+        */
+        <div
+          aria-hidden="true"
+          className="aspect-video relative overflow-hidden bg-gradient-to-br from-muted via-muted/60 to-muted flex items-center justify-center"
+        >
+          <UtensilsCrossed className="h-12 w-12 text-muted-foreground/40" strokeWidth={1.5} />
         </div>
       )}
       
