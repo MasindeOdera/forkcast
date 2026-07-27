@@ -71,19 +71,58 @@ export default function BarcodeScanner({
     abortRef.current = controller;
     setBusy(true);
     setError(null);
-    scanOnce({ videoEl: videoRef.current, signal: controller.signal })
-      .then((result) => {
+
+    // IMPORTANT: Defer the actual scan until after the next paint so
+    // that videoRef.current is guaranteed to be attached. Without this,
+    // Radix Tabs can mount <TabsContent value="camera"> *after* the
+    // effect fires when the dialog opens from a state where the
+    // scanner wasn't previously visible — in which case videoRef.current
+    // is still null and scanOnce() throws "videoEl is required for
+    // web-based scanning". requestAnimationFrame is the smallest,
+    // reliable "wait for the next commit" primitive we have.
+    let rafId = 0;
+    const cancelled = () => controller.signal.aborted;
+
+    const start = async () => {
+      if (!videoRef.current) {
+        await new Promise((resolve) => {
+          rafId = requestAnimationFrame(resolve);
+        });
+      }
+      if (cancelled()) return;
+      if (!videoRef.current) {
         setBusy(false);
-        if (result && !controller.signal.aborted) {
+        setError('Camera preview did not mount. Try closing and reopening the scanner, or use the Type tab.');
+        return;
+      }
+      try {
+        const result = await scanOnce({
+          videoEl: videoRef.current,
+          signal: controller.signal,
+        });
+        setBusy(false);
+        if (result && !cancelled()) {
           onDetected?.(result);
           onOpenChange?.(false);
         }
-      })
-      .catch((err) => {
+      } catch (err) {
+        if (cancelled()) return;
         setBusy(false);
-        setError(err?.message || 'Camera unavailable');
-      });
-    return () => controller.abort();
+        const msg = String(err?.message || '');
+        if (/permission|denied|notallowed/i.test(msg)) {
+          setError('Camera permission was blocked. Enable it in your browser settings, or use the Type tab.');
+        } else {
+          setError(msg || 'Camera unavailable');
+        }
+      }
+    };
+
+    start();
+
+    return () => {
+      controller.abort();
+      if (rafId) cancelAnimationFrame(rafId);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, tab, strategy]);
 

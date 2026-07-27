@@ -25,6 +25,30 @@ function withCors(response) {
   return response;
 }
 
+/**
+ * validateIsoDate — strict `YYYY-MM-DD` calendar date validator.
+ * Returns an error string if invalid, or null if OK. Catches both
+ * malformed strings (e.g. "hello") AND impossible calendars (e.g.
+ * "2024-13-45", "2024-02-31") by round-tripping through Date and
+ * comparing back to the input.
+ *
+ * Used by the pantry endpoints for `expiresAt`; safe to reuse anywhere
+ * we accept an ISO date without a time component.
+ */
+function validateIsoDate(input) {
+  if (typeof input !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(input)) {
+    return 'expiresAt must be YYYY-MM-DD';
+  }
+  // Parse in UTC to avoid the classic "-1 day" surprise when the
+  // server timezone is west of UTC.
+  const d = new Date(input + 'T00:00:00Z');
+  if (Number.isNaN(d.getTime()) || d.toISOString().slice(0, 10) !== input) {
+    return 'expiresAt is not a valid calendar date';
+  }
+  return null;
+}
+
+
 export async function GET(request, { params }) {
   try {
     const { db } = await connectToDatabase();
@@ -547,9 +571,13 @@ export async function POST(request, { params }) {
       if (!name) {
         return withCors(NextResponse.json({ error: 'Item name is required' }, { status: 400 }));
       }
-      // Very forgiving expiry validation \u2014 accepts ISO date (YYYY-MM-DD).
-      if (body.expiresAt && !/^\d{4}-\d{2}-\d{2}$/.test(body.expiresAt)) {
-        return withCors(NextResponse.json({ error: 'expiresAt must be YYYY-MM-DD' }, { status: 400 }));
+      // Strict expiry validation \u2014 accept ISO date (YYYY-MM-DD) AND
+      // reject impossible calendars like "2024-13-45". We check format
+      // first (cheap) then parse and round-trip through toISOString to
+      // catch out-of-range days/months.
+      if (body.expiresAt) {
+        const err = validateIsoDate(body.expiresAt);
+        if (err) return withCors(NextResponse.json({ error: err }, { status: 400 }));
       }
       const { item } = await db.collection('pantry_items').insertOne({
         userId: user.userId,
@@ -728,6 +756,13 @@ export async function PUT(request, { params }) {
     if (path.startsWith('pantry/') && path.split('/').length === 2) {
       const itemId = path.split('/')[1];
       const body = await request.json();
+      // Same strict expiry validation as POST /api/pantry when the
+      // field is being changed. Undefined = "don't touch it" so this
+      // path is skipped for name-only or quantity-only updates.
+      if (body.expiresAt !== undefined && body.expiresAt !== null) {
+        const err = validateIsoDate(body.expiresAt);
+        if (err) return withCors(NextResponse.json({ error: err }, { status: 400 }));
+      }
       const result = await db.collection('pantry_items').updateOne(
         { id: itemId, userId: user.userId },
         { $set: body }
