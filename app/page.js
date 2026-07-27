@@ -22,7 +22,6 @@ import {
   Loader2,
   UtensilsCrossed,
   RefreshCw,
-  Sparkles,
   AlertTriangle,
   CalendarDays,
   Trash2,
@@ -468,10 +467,12 @@ export default function App() {
                 </TabsTrigger>
                 <TabsTrigger value="my-meals" className="flex items-center gap-2">
                   <ChefHat className="h-4 w-4" />
-                  <span className="hidden sm:inline">My Meals</span>
-                  <Badge variant="secondary" className="ml-1">
-                    {myMeals.length}
-                  </Badge>
+                  <span className="hidden sm:inline-flex items-center gap-1.5">
+                    My Meals
+                    <Badge variant="secondary">
+                      {myMeals.length}
+                    </Badge>
+                  </span>
                 </TabsTrigger>
                 {/*
                   Renamed from "AI Ideas" → "Plan" because this tab hosts
@@ -481,10 +482,6 @@ export default function App() {
                 <TabsTrigger value="ai-suggestions" className="flex items-center gap-2">
                   <CalendarDays className="h-4 w-4" />
                   <span className="hidden sm:inline">Plan</span>
-                  <Badge variant="secondary" className="ml-1 bg-primary/10 text-primary gap-1">
-                    <Sparkles className="h-3 w-3" />
-                    AI
-                  </Badge>
                 </TabsTrigger>
               </TabsList>
 
