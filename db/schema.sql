@@ -106,4 +106,48 @@ revoke all on public.users       from anon, authenticated;
 revoke all on public.meals       from anon, authenticated;
 revoke all on public.meal_plans  from anon, authenticated;
 
+-- ---------------------------------------------------------------------------
+-- Kitchen feature (added in migration 002_kitchen.sql)
+-- ---------------------------------------------------------------------------
+-- pantry_items: what the user has at home. barcode is nullable because
+-- users can add items manually. expires_at nullable for non-perishables.
+create table if not exists public.pantry_items (
+    id          uuid            primary key default gen_random_uuid(),
+    user_id     uuid            not null references public.users(id) on delete cascade,
+    name        text            not null,
+    barcode     text,
+    quantity    numeric,
+    unit        text,
+    expires_at  date,
+    added_at    timestamptz     not null default now()
+);
+
+create index if not exists pantry_items_user_id_idx    on public.pantry_items (user_id);
+create index if not exists pantry_items_expires_at_idx on public.pantry_items (expires_at)
+    where expires_at is not null;
+create index if not exists pantry_items_name_trgm_idx  on public.pantry_items using gin (name gin_trgm_ops);
+
+-- shopping_list_items: what the user still needs to buy. source_meal_id
+-- lets us trace an item back to the recipe that added it (nullable for
+-- manually-added items).
+create table if not exists public.shopping_list_items (
+    id             uuid            primary key default gen_random_uuid(),
+    user_id        uuid            not null references public.users(id) on delete cascade,
+    name           text            not null,
+    checked        boolean         not null default false,
+    source_meal_id uuid            references public.meals(id) on delete set null,
+    added_at       timestamptz     not null default now()
+);
+
+create index if not exists shopping_list_items_user_id_idx on public.shopping_list_items (user_id);
+create index if not exists shopping_list_items_checked_idx on public.shopping_list_items (user_id, checked);
+
+alter table public.pantry_items        enable row level security;
+alter table public.pantry_items        force  row level security;
+alter table public.shopping_list_items enable row level security;
+alter table public.shopping_list_items force  row level security;
+
+revoke all on public.pantry_items        from anon, authenticated;
+revoke all on public.shopping_list_items from anon, authenticated;
+
 -- End of schema.

@@ -163,6 +163,77 @@ export async function GET(request, { params }) {
       return withCors(NextResponse.json(mealWithUser));
     }
 
+    // -----------------------------------------------------------------
+    // Kitchen: GET /api/pantry \u2014 list all pantry items for the user
+    // -----------------------------------------------------------------
+    if (path === 'pantry') {
+      const user = getUserFromToken(request);
+      if (!user) {
+        return withCors(NextResponse.json({ error: 'Unauthorized' }, { status: 401 }));
+      }
+      const items = await db.collection('pantry_items').find({ userId: user.userId });
+      return withCors(NextResponse.json(items));
+    }
+
+    // -----------------------------------------------------------------
+    // Kitchen: GET /api/shopping-list \u2014 list all shopping list items
+    // -----------------------------------------------------------------
+    if (path === 'shopping-list') {
+      const user = getUserFromToken(request);
+      if (!user) {
+        return withCors(NextResponse.json({ error: 'Unauthorized' }, { status: 401 }));
+      }
+      const items = await db.collection('shopping_list_items').find({ userId: user.userId });
+      return withCors(NextResponse.json(items));
+    }
+
+    // -----------------------------------------------------------------
+    // Kitchen: GET /api/barcode-lookup?code=<barcode>
+    // -----------------------------------------------------------------
+    // Server-side proxy to Open Food Facts (https://openfoodfacts.org).
+    // We proxy for three reasons:
+    //   1. Avoids browser CORS quirks on iOS Safari
+    //   2. Lets us normalise the response shape (name, brand, image)
+    //   3. Future-proofs for caching / rate limiting
+    // Open Food Facts requires no API key and has ~3M food products.
+    if (path === 'barcode-lookup') {
+      const user = getUserFromToken(request);
+      if (!user) {
+        return withCors(NextResponse.json({ error: 'Unauthorized' }, { status: 401 }));
+      }
+      const code = url.searchParams.get('code');
+      if (!code || !/^\d{6,14}$/.test(code)) {
+        return withCors(NextResponse.json({ error: 'Invalid barcode' }, { status: 400 }));
+      }
+      try {
+        const upstream = await fetch(
+          `https://world.openfoodfacts.org/api/v2/product/${encodeURIComponent(code)}.json?fields=product_name,brands,image_thumb_url,quantity`,
+          { headers: { 'User-Agent': 'Forkcast/1.0 (kitchen barcode lookup)' } }
+        );
+        if (!upstream.ok) {
+          return withCors(NextResponse.json({ found: false, code }, { status: 200 }));
+        }
+        const payload = await upstream.json();
+        if (payload.status !== 1 || !payload.product) {
+          return withCors(NextResponse.json({ found: false, code }, { status: 200 }));
+        }
+        const p = payload.product;
+        return withCors(NextResponse.json({
+          found: true,
+          code,
+          name: p.product_name || null,
+          brand: p.brands || null,
+          image: p.image_thumb_url || null,
+          quantity: p.quantity || null,
+        }));
+      } catch (err) {
+        console.error('Barcode lookup error:', err);
+        // Never fail the client on lookup errors \u2014 they should still
+        // be able to add the item manually.
+        return withCors(NextResponse.json({ found: false, code, error: 'lookup_failed' }, { status: 200 }));
+      }
+    }
+
     return withCors(NextResponse.json({ error: 'Not found' }, { status: 404 }));
     
   } catch (error) {
@@ -406,7 +477,7 @@ export async function POST(request, { params }) {
       }
 
       try {
-        const { prompt, ingredients, dietary, cuisine, mealType } = await request.json();
+        const { prompt, ingredients, dietary, cuisine, mealType, usePantry } = await request.json();
         
         if (!prompt || prompt.trim().length === 0) {
           return withCors(NextResponse.json({ 
@@ -421,9 +492,30 @@ export async function POST(request, { params }) {
           }, { status: 500 }));
         }
 
+        // Kitchen integration: when usePantry is true, fold pantry
+        // contents (minus expired items) into the ingredients list so
+        // the LLM only proposes meals the user can actually cook now.
+        let mergedIngredients = Array.isArray(ingredients) ? [...ingredients] : [];
+        if (usePantry) {
+          try {
+            const pantry = await db.collection('pantry_items').find({ userId: user.userId });
+            const today = new Date().toISOString().slice(0, 10);
+            const fresh = pantry.filter(
+              (p) => !p.expiresAt || p.expiresAt >= today
+            );
+            mergedIngredients = Array.from(new Set([
+              ...mergedIngredients,
+              ...fresh.map((p) => p.name),
+            ]));
+          } catch (pantryErr) {
+            // Non-fatal: if pantry lookup fails, still generate ideas.
+            console.warn('Pantry merge failed; continuing without it:', pantryErr?.message);
+          }
+        }
+
         const mealService = new MealSuggestionService(apiKey);
         const suggestions = await mealService.getMealSuggestions(prompt, {
-          ingredients,
+          ingredients: mergedIngredients,
           dietary,
           cuisine,
           mealType
@@ -436,6 +528,118 @@ export async function POST(request, { params }) {
           error: 'Failed to generate meal suggestions. Please try again.' 
         }, { status: 500 }));
       }
+    }
+
+    // -----------------------------------------------------------------
+    // Kitchen: POST /api/pantry \u2014 add a pantry item
+    // -----------------------------------------------------------------
+    // Body: { name, barcode?, quantity?, unit?, expiresAt? }
+    if (path === 'pantry') {
+      const user = getUserFromToken(request);
+      if (!user) {
+        return withCors(NextResponse.json({ error: 'Unauthorized' }, { status: 401 }));
+      }
+      let body;
+      try { body = await request.json(); }
+      catch { return withCors(NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })); }
+
+      const name = (body.name || '').trim();
+      if (!name) {
+        return withCors(NextResponse.json({ error: 'Item name is required' }, { status: 400 }));
+      }
+      // Very forgiving expiry validation \u2014 accepts ISO date (YYYY-MM-DD).
+      if (body.expiresAt && !/^\d{4}-\d{2}-\d{2}$/.test(body.expiresAt)) {
+        return withCors(NextResponse.json({ error: 'expiresAt must be YYYY-MM-DD' }, { status: 400 }));
+      }
+      const { item } = await db.collection('pantry_items').insertOne({
+        userId: user.userId,
+        name,
+        barcode: body.barcode || null,
+        quantity: body.quantity ?? null,
+        unit: body.unit || null,
+        expiresAt: body.expiresAt || null,
+      });
+      return withCors(NextResponse.json(item));
+    }
+
+    // -----------------------------------------------------------------
+    // Kitchen: POST /api/shopping-list \u2014 add manual shopping list item
+    // -----------------------------------------------------------------
+    // Body: { name, sourceMealId? }
+    if (path === 'shopping-list') {
+      const user = getUserFromToken(request);
+      if (!user) {
+        return withCors(NextResponse.json({ error: 'Unauthorized' }, { status: 401 }));
+      }
+      let body;
+      try { body = await request.json(); }
+      catch { return withCors(NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })); }
+
+      const name = (body.name || '').trim();
+      if (!name) {
+        return withCors(NextResponse.json({ error: 'Item name is required' }, { status: 400 }));
+      }
+      const { item } = await db.collection('shopping_list_items').insertOne({
+        userId: user.userId,
+        name,
+        sourceMealId: body.sourceMealId || null,
+      });
+      return withCors(NextResponse.json(item));
+    }
+
+    // -----------------------------------------------------------------
+    // Kitchen: POST /api/shopping-list/generate \u2014 build shopping list
+    // from the week's planned meals.
+    // -----------------------------------------------------------------
+    // Body: { startDate, endDate }  (ISO YYYY-MM-DD)
+    // Aggregates every ingredient across all meal_plans in the range
+    // whose meal belongs to this user. Duplicates (case-insensitive) are
+    // de-duped and existing shopping list items are preserved.
+    if (path === 'shopping-list/generate') {
+      const user = getUserFromToken(request);
+      if (!user) {
+        return withCors(NextResponse.json({ error: 'Unauthorized' }, { status: 401 }));
+      }
+      let body;
+      try { body = await request.json(); }
+      catch { return withCors(NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })); }
+
+      const { startDate, endDate } = body;
+      if (!startDate || !endDate) {
+        return withCors(NextResponse.json({
+          error: 'startDate and endDate are required'
+        }, { status: 400 }));
+      }
+
+      const plans = await db.collection('meal_plans').find({
+        userId: user.userId,
+        dateRange: { start: startDate, end: endDate },
+      });
+
+      // Aggregate ingredients across every planned meal in the range.
+      const nameToSource = {};
+      for (const plan of plans) {
+        if (!plan?.meal?.ingredients) continue;
+        const lines = String(plan.meal.ingredients)
+          .split('\n')
+          .map((l) => l.trim())
+          .filter(Boolean);
+        for (const line of lines) {
+          const key = line.toLowerCase();
+          if (!(key in nameToSource)) nameToSource[key] = { name: line, sourceMealId: plan.meal.id };
+        }
+      }
+
+      const uniqueNames = Object.values(nameToSource).map((n) => n.name);
+      const sourceMap = {};
+      for (const v of Object.values(nameToSource)) sourceMap[v.name] = v.sourceMealId;
+
+      const { inserted } = await db.collection('shopping_list_items').insertMany(
+        user.userId, uniqueNames, sourceMap
+      );
+
+      const items = await db.collection('shopping_list_items').find({ userId: user.userId });
+      return withCors(NextResponse.json({ inserted, items }));
     }
 
     return withCors(NextResponse.json({ error: 'Not found' }, { status: 404 }));
@@ -516,6 +720,40 @@ export async function PUT(request, { params }) {
 
       const updatedMeal = await db.collection('meals').findOne({ id: mealId });
       return withCors(NextResponse.json(updatedMeal));
+    }
+
+    // -----------------------------------------------------------------
+    // Kitchen: PUT /api/pantry/:id \u2014 update a pantry item
+    // -----------------------------------------------------------------
+    if (path.startsWith('pantry/') && path.split('/').length === 2) {
+      const itemId = path.split('/')[1];
+      const body = await request.json();
+      const result = await db.collection('pantry_items').updateOne(
+        { id: itemId, userId: user.userId },
+        { $set: body }
+      );
+      if (result.matchedCount === 0) {
+        return withCors(NextResponse.json({ error: 'Item not found' }, { status: 404 }));
+      }
+      const updated = await db.collection('pantry_items').findOne({ id: itemId, userId: user.userId });
+      return withCors(NextResponse.json(updated));
+    }
+
+    // -----------------------------------------------------------------
+    // Kitchen: PUT /api/shopping-list/:id \u2014 toggle checked / rename
+    // -----------------------------------------------------------------
+    if (path.startsWith('shopping-list/') && path.split('/').length === 2) {
+      const itemId = path.split('/')[1];
+      const body = await request.json();
+      const result = await db.collection('shopping_list_items').updateOne(
+        { id: itemId, userId: user.userId },
+        { $set: body }
+      );
+      if (result.matchedCount === 0) {
+        return withCors(NextResponse.json({ error: 'Item not found' }, { status: 404 }));
+      }
+      const updated = await db.collection('shopping_list_items').findOne({ id: itemId, userId: user.userId });
+      return withCors(NextResponse.json(updated));
     }
 
     return withCors(NextResponse.json({ error: 'Not found' }, { status: 404 }));
@@ -606,6 +844,43 @@ export async function DELETE(request, { params }) {
           details: error.message 
         }, { status: 500 }));
       }
+    }
+
+    // -----------------------------------------------------------------
+    // Kitchen: DELETE /api/pantry/:id \u2014 remove a pantry item
+    // -----------------------------------------------------------------
+    if (path.startsWith('pantry/') && path.split('/').length === 2) {
+      const itemId = path.split('/')[1];
+      const result = await db.collection('pantry_items').deleteOne({
+        id: itemId, userId: user.userId,
+      });
+      if (result.deletedCount === 0) {
+        return withCors(NextResponse.json({ error: 'Item not found' }, { status: 404 }));
+      }
+      return withCors(NextResponse.json({ message: 'Item removed' }));
+    }
+
+    // -----------------------------------------------------------------
+    // Kitchen: DELETE /api/shopping-list \u2014 clear all checked items
+    //          DELETE /api/shopping-list/:id \u2014 remove single item
+    // -----------------------------------------------------------------
+    if (path === 'shopping-list') {
+      const clearChecked = url.searchParams.get('checked') === 'true';
+      const result = await db.collection('shopping_list_items').deleteOne({
+        userId: user.userId,
+        ...(clearChecked ? { checked: true } : {}),
+      });
+      return withCors(NextResponse.json({ deleted: result.deletedCount }));
+    }
+    if (path.startsWith('shopping-list/') && path.split('/').length === 2) {
+      const itemId = path.split('/')[1];
+      const result = await db.collection('shopping_list_items').deleteOne({
+        id: itemId, userId: user.userId,
+      });
+      if (result.deletedCount === 0) {
+        return withCors(NextResponse.json({ error: 'Item not found' }, { status: 404 }));
+      }
+      return withCors(NextResponse.json({ message: 'Item removed' }));
     }
 
     return withCors(NextResponse.json({ error: 'Not found' }, { status: 404 }));

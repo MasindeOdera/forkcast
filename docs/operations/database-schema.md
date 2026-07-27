@@ -37,15 +37,48 @@ Forkcast uses Supabase (Postgres). All primary keys are **UUIDs** (never Mongo `
 | `planned_for`| `date`       | The day this meal is scheduled for       |
 | `created_at` | `timestamptz`|                                          |
 
+## `pantry_items`  <sub>(Kitchen feature)</sub>
+
+Ingredients the user has at home. Added in `db/migrations/002_kitchen.sql`.
+
+| Column       | Type         | Notes                                                |
+|--------------|--------------|------------------------------------------------------|
+| `id`         | `uuid` PK    |                                                      |
+| `user_id`    | `uuid` FK    | → `users.id` (cascade delete)                        |
+| `name`       | `text`       | Free-form product name                               |
+| `barcode`    | `text` null  | UPC / EAN string when scanned                        |
+| `quantity`   | `numeric` null|                                                     |
+| `unit`       | `text` null  | e.g. `g`, `ml`, `pcs`                                |
+| `expires_at` | `date` null  | Optional; nullable for non-perishables               |
+| `added_at`   | `timestamptz`|                                                      |
+
+## `shopping_list_items`  <sub>(Kitchen feature)</sub>
+
+Items on the user's shopping list. Added in `db/migrations/002_kitchen.sql`.
+
+| Column           | Type          | Notes                                        |
+|------------------|---------------|----------------------------------------------|
+| `id`             | `uuid` PK     |                                              |
+| `user_id`        | `uuid` FK     | → `users.id` (cascade delete)                |
+| `name`           | `text`        | Ingredient / product name                    |
+| `checked`        | `boolean`     | `true` when the user has picked it up        |
+| `source_meal_id` | `uuid` FK null| → `meals.id` (set null on delete). Traces the item back to the recipe that produced it during a shopping list generation. |
+| `added_at`       | `timestamptz` |                                              |
+
 ## Relationships
 
 ```
 users (1) ────< meals
   │
-  └────< meal_plans >──── meals
+  ├────< meal_plans >──── meals
+  ├────< pantry_items
+  └────< shopping_list_items >──── meals (nullable)
 ```
 
 - A user has many meals (`meals.user_id → users.id`).
 - A meal plan links a user to a meal for a given day.
+- Pantry items and shopping list items are per-user.
+- Shopping list items **may** be traced back to the meal they came from
+  via `source_meal_id` (nullable so manually-added items are OK).
 
 See [operations/debugging.md](./debugging.md) for how to inspect and edit this data.

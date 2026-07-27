@@ -6,8 +6,9 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Calendar, ChefHat, Plus, Utensils, Coffee, Clock, Sparkles, ChevronLeft, ChevronRight, Users, X } from 'lucide-react';
+import { Calendar, ChefHat, Plus, Utensils, Coffee, Clock, Sparkles, ChevronLeft, ChevronRight, Users, X, Share2 } from 'lucide-react';
 import { format, startOfWeek, addDays, isSameDay, parseISO, isToday } from 'date-fns';
+import SharePlanDialog from '@/components/SharePlanDialog';
 
 const MEAL_TYPES = [
   { value: 'breakfast', label: 'Breakfast', icon: Coffee },
@@ -27,6 +28,8 @@ export default function MealPlanningCalendar() {
   const [showCommunityPlans, setShowCommunityPlans] = useState(false);
   const [draggedMeal, setDraggedMeal] = useState(null);
   const [selectedDayIndex, setSelectedDayIndex] = useState(0);
+  // Kitchen: state for the "Share this plan" dialog.
+  const [shareOpen, setShareOpen] = useState(false);
 
   // Load user's meals and meal plan data
   useEffect(() => {
@@ -387,6 +390,11 @@ export default function MealPlanningCalendar() {
                 <Sparkles className="h-4 w-4" />
                 AI Weekly Plan
               </Button>
+              {/* Kitchen: share this week's plan to another device (see SharePlanDialog). */}
+              <Button variant="outline" onClick={() => setShareOpen(true)} className="flex items-center gap-2">
+                <Share2 className="h-4 w-4" />
+                Share Plan
+              </Button>
             </div>
           </div>
 
@@ -444,6 +452,15 @@ export default function MealPlanningCalendar() {
                 aria-label="Toggle community plans"
               >
                 <Users className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShareOpen(true)}
+                className="h-9 px-2.5 shrink-0"
+                aria-label="Share this plan"
+              >
+                <Share2 className="h-4 w-4" />
               </Button>
             </div>
           </div>
@@ -822,6 +839,25 @@ export default function MealPlanningCalendar() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/*
+        Kitchen: Share Plan dialog. The payload is a compact snapshot of
+        the current week \u2014 meals per (date, mealType). The receiving
+        device can decode this via QR without any account or internet.
+      */}
+      <SharePlanDialog
+        open={shareOpen}
+        onOpenChange={setShareOpen}
+        plan={{
+          title: `Week of ${format(currentWeek, 'MMM d, yyyy')}`,
+          weekStart: format(currentWeek, 'yyyy-MM-dd'),
+          entries: Object.entries(mealPlan || {}).map(([key, meal]) => ({
+            key,
+            title: meal?.title || 'Untitled',
+            ingredients: meal?.ingredients || '',
+          })),
+        }}
+      />
     </div>
   );
 }

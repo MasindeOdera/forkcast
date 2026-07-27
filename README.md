@@ -20,6 +20,18 @@ Forkcast is a modern meal planning app built with Next.js, Supabase (Postgres), 
   - Cuisine preferences (Italian, Mexican, Indian, etc.)
   - Meal type (breakfast, lunch, dinner, snacks)
   - Custom prompts and preferences
+  - **Pantry-aware mode** — pass `usePantry: true` to only suggest meals you can cook with what's already in your pantry
+
+### Kitchen & Sharing 🛒
+- **Shopping List** — auto-generated from your week's planned meals, tick items off manually or by scanning a barcode
+- **Pantry** — track what you have at home; expiring items are surfaced with a soft red/amber call-out and one-tap removal
+- **Barcode scanning** — camera (BarcodeDetector or ZXing fallback), Bluetooth HID scanners work by default (they act as keyboards), and native ML Kit when wrapped in Capacitor
+- **Open Food Facts** proxy resolves barcodes to product names, no API key required
+- **Share plan phone-to-phone** — Native OS Share (AirDrop / Nearby Share, no internet needed), QR code fallback for any device with a camera, plus a v2 toggle for direct BLE peer-to-peer once wrapped in Capacitor
+- See [docs/features/kitchen.md](./docs/features/kitchen.md) and [docs/features/plan-sharing.md](./docs/features/plan-sharing.md)
+
+### Native (optional)
+- **Capacitor** wrapper for iOS and Android — the same web code, plus native scanner and Bluetooth. Web build stays lean; native plugins are dynamically imported only when present. See [docs/native/capacitor-setup.md](./docs/native/capacitor-setup.md).
 
 ### Technical Features 🛠️
 - **Next.js 14**: App Router, React Server Components

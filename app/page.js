@@ -32,6 +32,7 @@ import AuthForm from '@/components/AuthForm';
 import MealCard from '@/components/MealCard';
 import MealForm from '@/components/MealForm';
 import MealSuggestions from '@/components/MealSuggestions';
+import Kitchen from '@/components/kitchen/Kitchen';
 import { EmptyState } from '@/components/ui/empty-state';
 import { MealCardGrid } from '@/components/ui/meal-card-skeleton';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
@@ -483,6 +484,15 @@ export default function App() {
                   <CalendarDays className="h-4 w-4" />
                   <span className="hidden sm:inline">Plan</span>
                 </TabsTrigger>
+                {/*
+                  Kitchen tab (added for BLE / scanner + pantry features).
+                  Hosts Shopping List and Pantry sub-tabs. See
+                  docs/features/kitchen.md.
+                */}
+                <TabsTrigger value="kitchen" className="flex items-center gap-2">
+                  <UtensilsCrossed className="h-4 w-4" />
+                  <span className="hidden sm:inline">Kitchen</span>
+                </TabsTrigger>
               </TabsList>
 
               <Button
@@ -517,6 +527,10 @@ export default function App() {
               <div className="flex items-center justify-center">
                 <MealSuggestions />
               </div>
+            </TabsContent>
+
+            <TabsContent value="kitchen" className="space-y-6">
+              <Kitchen />
             </TabsContent>
           </Tabs>
         </div>

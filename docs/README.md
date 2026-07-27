@@ -20,6 +20,11 @@ docs/
 │   ├── debugging.md            # Comprehensive debugging guide (frontend → backend → DB)
 │   ├── database-schema.md      # Tables, columns, relationships
 │   └── deployment.md           # How the app is deployed
+├── features/                   # Product features that span multiple files
+│   ├── kitchen.md              # Shopping list + Pantry + barcode scanner
+│   └── plan-sharing.md         # Phone-to-phone plan sharing (Native Share / QR / v2 BLE)
+├── native/                     # Wrapping Forkcast as a native app
+│   └── capacitor-setup.md      # Adding Capacitor for iOS / Android + native BLE + native scanner
 └── reference/                  # Reference material
     ├── api-reference.md        # All API endpoints
     ├── ui-components.md        # Key React components
@@ -30,6 +35,8 @@ Related files at the repo root:
 
 - [`AGENTS.md`](../AGENTS.md) — discovery file for AI coding assistants; points them at `docs/workflow/github.md`.
 - [`db/schema.sql`](../db/schema.sql) — runnable Postgres schema for a fresh Supabase project.
+- [`db/migrations/`](../db/migrations/) — additive migrations you apply to an existing project.
+- [`capacitor.config.json`](../capacitor.config.json) — Capacitor config; see [native/capacitor-setup.md](./native/capacitor-setup.md).
 - [`.github/workflows/supabase-keepalive.yml`](../.github/workflows/supabase-keepalive.yml) — the cron that keeps Supabase from auto-pausing.
 
 ## 🚀 I want to…
@@ -39,6 +46,9 @@ Related files at the repo root:
 | Run the app on my machine                       | [getting-started.md](./getting-started.md)              |
 | Understand what Supabase / Cloudinary / Vercel / Emergent LLM do here | [services/](./services)         |
 | Fix or extend an API endpoint                   | [reference/api-reference.md](./reference/api-reference.md) |
+| Add the Kitchen (Pantry + Shopping) feature     | [features/kitchen.md](./features/kitchen.md)            |
+| Share a meal plan phone-to-phone                | [features/plan-sharing.md](./features/plan-sharing.md)  |
+| Wrap Forkcast as an iOS / Android app           | [native/capacitor-setup.md](./native/capacitor-setup.md)|
 | Figure out why something is broken              | [operations/debugging.md](./operations/debugging.md)    |
 | Look at or edit real data                       | [operations/debugging.md](./operations/debugging.md) → "Manipulating data" |
 | Open a pull request                             | [workflow/github.md](./workflow/github.md)              |

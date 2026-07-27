@@ -1,0 +1,18 @@
+{
+  "appId": "app.forkcast.mobile",
+  "appName": "Forkcast",
+  "webDir": "out",
+  "server": {
+    "cleartext": false,
+    "androidScheme": "https"
+  },
+  "plugins": {
+    "BarcodeScanner": {
+      "cameraDirection": "back"
+    }
+  },
+  "comments": {
+    "webDir": "Set to 'out' assuming you use `next export`. If you build a server-rendered app, replace with a static Next.js build (e.g. Vercel edge exported) or a custom server bridge. See docs/native/capacitor-setup.md.",
+    "appId": "Change to your own reverse-DNS bundle id before publishing."
+  }
+}
