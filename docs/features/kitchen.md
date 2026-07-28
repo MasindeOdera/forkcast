@@ -57,7 +57,8 @@ suggestions respect what you can actually cook right now.
 | PUT    | `/api/shopping-list/:id`          | Toggle checked / rename                       |
 | DELETE | `/api/shopping-list/:id`          | Remove one item                               |
 | DELETE | `/api/shopping-list?checked=true` | Clear all checked items                       |
-| GET    | `/api/barcode-lookup?code=X`      | Server-side Open Food Facts proxy             |
+| GET    | `/api/barcode-lookup?code=X`      | Fast product lookup across the free-source chain (stops on first hit) |
+| GET    | `/api/barcode-diagnose?code=X`    | Verbose per-source breakdown for debugging misses (never stops early) |
 
 All routes require the `Authorization: Bearer <jwt>` header and are
 scoped by `user_id` at the query level.
@@ -101,10 +102,58 @@ BLE HID scanners "just work" by focusing that input.
 
 ---
 
-## Open Food Facts
+## Product-database chain
 
-Barcode-to-product resolution uses the free
-[Open Food Facts](https://world.openfoodfacts.org/data) API. No key
-required, ~3M food products. We proxy through `/api/barcode-lookup` to
-avoid CORS issues on iOS Safari and to keep a place to add caching or
-rate limiting later.
+Barcode-to-product resolution is a **multi-source fallback chain** — see
+`lib/barcode-lookup.js` and the runbook in `docs/operations/debugging.md`.
+
+Sources are queried in order and the first hit wins. All sources are
+free and require no API key.
+
+| Order | Source                         | Coverage                              |
+|-------|--------------------------------|---------------------------------------|
+| 1     | Open Food Facts                | ~3M food products                     |
+| 2     | Open Beauty Facts              | Cosmetics, toiletries                 |
+| 3     | Open Products Facts            | General household goods               |
+| 4     | Open Pet Food Facts            | Pet food                              |
+| 5     | UPCitemdb (trial)              | Non-food consumer goods, ~100/day/IP  |
+
+Each source is called with:
+
+- 8-second timeout (survives Vercel cold starts + slow upstreams).
+- One automatic retry with exponential backoff on 5xx / network error.
+- A meaningful `User-Agent` (Open Food Facts policy asks for one).
+
+The three most common reasons a scan misses even when the product
+exists:
+
+1. **Shared-IP rate limits** — Vercel serverless functions share
+   outbound IPs across many customers, so Open Food Facts occasionally
+   returns 429 to our region.
+2. **Cold-start timeout** — first request after idle can breach 8s if
+   the upstream is also slow.
+3. **GS1-reserved in-store codes** — any barcode with prefix `02` or
+   `20`–`29` will **never** be in a public database. Detected by
+   `isInternalStoreCode()` in `lib/barcode-utils.js`; the client-side
+   `UnknownBarcodeDialog` explains this to the user and lets them
+   teach it once.
+
+The client-side flow (`components/kitchen/ShoppingList.js`,
+`components/kitchen/Pantry.js`) already does the right thing in all
+three cases via `lib/barcode-cache.js`:
+
+- Cache hit? → zero network, instant match.
+- API hit?   → cache + use.
+- Miss?      → open `UnknownBarcodeDialog`, save the taught mapping
+  under `source: 'user'` (highest trust — never overwritten by later
+  external lookups).
+
+### Adding another source
+
+The header comment in `lib/barcode-lookup.js` has a step-by-step
+checklist. Short version: define a `lookupFoo(code)` returning the
+normalised product shape (or null), then add
+`{ id: 'foo', name: 'Foo DB', run: lookupFoo }` to the `SOURCES`
+array. Sources that need an API key should read it from `process.env`
+inside the lookup and return null when absent, so environments that
+don't configure the key just skip that source.

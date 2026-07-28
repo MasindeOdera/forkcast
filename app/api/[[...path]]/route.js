@@ -4,6 +4,7 @@ import { hashPassword, verifyPassword, generateToken, getUserFromToken } from '@
 import { MealSuggestionService } from '@/lib/llm-service';
 import cloudinary from '@/lib/cloudinary';
 import { v4 as uuidv4 } from 'uuid';
+import { runLookupChain, runDiagnosis } from '@/lib/barcode-lookup';
 
 // CORS headers
 const corsHeaders = {
@@ -49,99 +50,9 @@ function validateIsoDate(input) {
 }
 
 // ---------------------------------------------------------------------
-// Barcode helpers (shared by /api/barcode-lookup)
+// Barcode helpers live in lib/barcode-lookup.js
+// See docs/operations/debugging.md for the debugging runbook.
 // ---------------------------------------------------------------------
-
-/**
- * Build the ordered list of code variants to try upstream. Purely
- * numeric; we do NOT try to compute check digits (too many false
- * positives, wastes free-tier quota).
- *
- * Order = most-likely-canonical first so identical codes hit CDN
- * caches at Open Food Facts.
- */
-function buildBarcodeVariants(raw) {
-  const set = new Set();
-  const add = (v) => { if (v) set.add(v); };
-  add(raw);
-  if (/^\d+$/.test(raw)) {
-    if (raw.length === 12) add('0' + raw);             // UPC-A → EAN-13
-    if (raw.length === 13 && raw.startsWith('0')) add(raw.slice(1)); // EAN-13 → UPC-A
-    if (raw.length === 14) add(raw.slice(1));          // GTIN-14 → EAN-13
-    if (raw.length === 8) add('00000' + raw);          // EAN-8 → GTIN-13
-  }
-  return Array.from(set);
-}
-
-/**
- * Open Food Facts lookup. Returns
- *   { found: true, name, brand, image, quantity }
- * on hit, or null on miss / error. Never throws.
- */
-async function lookupOpenFoodFacts(code) {
-  try {
-    const upstream = await fetch(
-      `https://world.openfoodfacts.org/api/v2/product/${encodeURIComponent(code)}.json?fields=product_name,brands,image_thumb_url,quantity`,
-      {
-        headers: { 'User-Agent': 'Forkcast/1.0 (kitchen barcode lookup)' },
-        // Small timeout — we have another database to try, so don't
-        // let a slow OFF request block the whole request.
-        signal: AbortSignal.timeout(4000),
-      }
-    );
-    if (!upstream.ok) return null;
-    const payload = await upstream.json();
-    if (payload.status !== 1 || !payload.product) return null;
-    const p = payload.product;
-    // Reject empty results — OFF sometimes returns status=1 but every
-    // useful field empty (draft entry with only a photo, etc.).
-    if (!p.product_name && !p.brands) return null;
-    return {
-      found: true,
-      name: p.product_name || null,
-      brand: p.brands || null,
-      image: p.image_thumb_url || null,
-      quantity: p.quantity || null,
-    };
-  } catch (err) {
-    console.warn('OFF lookup failed:', err?.message || err);
-    return null;
-  }
-}
-
-/**
- * UPCitemdb trial-endpoint lookup. No API key required; the trial
- * tier is limited to ~100 requests/day per source IP. This covers
- * many non-food consumer items that Open Food Facts is missing (e.g.
- * personal care, home goods) and often has European groceries too.
- */
-async function lookupUpcItemDb(code) {
-  try {
-    const upstream = await fetch(
-      `https://api.upcitemdb.com/prod/trial/lookup?upc=${encodeURIComponent(code)}`,
-      {
-        headers: { 'User-Agent': 'Forkcast/1.0 (kitchen barcode lookup)' },
-        signal: AbortSignal.timeout(4000),
-      }
-    );
-    // 404 = not found; 429 = rate limited today (silently ignore)
-    if (!upstream.ok) return null;
-    const payload = await upstream.json();
-    const item = Array.isArray(payload.items) ? payload.items[0] : null;
-    if (!item) return null;
-    if (!item.title && !item.brand) return null;
-    return {
-      found: true,
-      name: item.title || null,
-      brand: item.brand || null,
-      image: (Array.isArray(item.images) && item.images[0]) || null,
-      quantity: item.size || null,
-    };
-  } catch (err) {
-    console.warn('UPCitemdb lookup failed:', err?.message || err);
-    return null;
-  }
-}
 
 
 export async function GET(request, { params }) {
@@ -309,24 +220,14 @@ export async function GET(request, { params }) {
     // -----------------------------------------------------------------
     // Kitchen: GET /api/barcode-lookup?code=<barcode>
     // -----------------------------------------------------------------
-    // Server-side proxy to a chain of product databases.
+    // Fast path — walks the source chain (four Open Facts sister
+    // databases + UPCitemdb trial) and returns the first hit, or
+    // {found:false} if no source knows this code. All heavy lifting
+    // lives in lib/barcode-lookup.js so this handler stays minimal.
     //
-    //   1. Open Food Facts — https://openfoodfacts.org (no key, food-only)
-    //   2. UPCitemdb trial — https://api.upcitemdb.com/prod/trial/lookup
-    //      (no key, ~100 req/day per IP, covers non-food items too)
-    //
-    // We also try a small list of code *variants* (leading zero add/
-    // strip, GTIN-14 → EAN-13) because real-world Bluetooth scanners
-    // sometimes emit UPC-A codes as 12 digits while the product is
-    // listed as EAN-13, and vice versa.
-    //
-    // The response shape is unchanged:
-    //   { found: true, code, name, brand, image, quantity, source }
-    //   { found: false, code, source: 'none', triedVariants: [...] }
-    // We proxy for three reasons:
-    //   1. Avoids browser CORS quirks on iOS Safari
-    //   2. Lets us normalise the response shape across databases
-    //   3. Future-proofs for caching / rate limiting
+    // Debugging: if this returns found:false but the product genuinely
+    // exists, call GET /api/barcode-diagnose?code=<code> to see per-
+    // source verdicts. See docs/operations/debugging.md for a runbook.
     if (path === 'barcode-lookup') {
       const user = getUserFromToken(request);
       if (!user) {
@@ -336,34 +237,40 @@ export async function GET(request, { params }) {
       if (!rawCode || !/^\d{6,14}$/.test(rawCode)) {
         return withCors(NextResponse.json({ error: 'Invalid barcode' }, { status: 400 }));
       }
+      console.log(`[barcode] lookup ${rawCode}`);
+      const result = await runLookupChain(rawCode);
+      return withCors(NextResponse.json(result));
+    }
 
-      // Build a small ordered list of variants to try. Keep the caller-
-      // provided form first so identical codes hit any upstream caches.
-      const tried = [];
-      const variants = buildBarcodeVariants(rawCode);
-      for (const code of variants) {
-        tried.push(code);
-        // --- Try Open Food Facts ------------------------------------
-        const off = await lookupOpenFoodFacts(code);
-        if (off?.found) {
-          return withCors(NextResponse.json({ ...off, code, requestedCode: rawCode, source: 'off', triedVariants: tried }));
-        }
-        // --- Try UPCitemdb (covers non-food + broader UPC catalog) --
-        const upc = await lookupUpcItemDb(code);
-        if (upc?.found) {
-          return withCors(NextResponse.json({ ...upc, code, requestedCode: rawCode, source: 'upcitemdb', triedVariants: tried }));
-        }
+    // -----------------------------------------------------------------
+    // Kitchen: GET /api/barcode-diagnose?code=<barcode>
+    // -----------------------------------------------------------------
+    // Verbose diagnostic — runs the FULL source chain (no early exit)
+    // and returns a per-source breakdown so you can see which upstream
+    // gave what. Useful when a user reports a scan that didn't resolve
+    // even though the product exists in Open Food Facts.
+    //
+    // Example:
+    //   curl -H "Authorization: Bearer <token>" \
+    //     "https://forkcast-six.vercel.app/api/barcode-diagnose?code=4056489592068"
+    //
+    // Returns 200 always (never a 5xx from lookup errors). The
+    // `attempts[]` array contains one entry per (variant × source)
+    // combination that was queried.
+    //
+    // Auth: requires a logged-in session, same as barcode-lookup.
+    if (path === 'barcode-diagnose') {
+      const user = getUserFromToken(request);
+      if (!user) {
+        return withCors(NextResponse.json({ error: 'Unauthorized' }, { status: 401 }));
       }
-
-      // Nothing found anywhere. Return 200 so the client can gracefully
-      // prompt the user to name it — never fail the request.
-      return withCors(NextResponse.json({
-        found: false,
-        code: rawCode,
-        requestedCode: rawCode,
-        source: 'none',
-        triedVariants: tried,
-      }));
+      const rawCode = url.searchParams.get('code');
+      if (!rawCode || !/^\d{6,14}$/.test(rawCode)) {
+        return withCors(NextResponse.json({ error: 'Invalid barcode' }, { status: 400 }));
+      }
+      console.log(`[barcode] diagnose ${rawCode}`);
+      const result = await runDiagnosis(rawCode);
+      return withCors(NextResponse.json(result));
     }
 
     return withCors(NextResponse.json({ error: 'Not found' }, { status: 404 }));

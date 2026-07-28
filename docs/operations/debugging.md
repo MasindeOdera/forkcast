@@ -211,6 +211,98 @@ The same endpoint is pinged by our GitHub Actions cron every ~3 days to prevent 
 | Supabase (DB errors)  | Supabase Dashboard → Logs → Postgres logs / API                     |
 | GitHub Actions        | GitHub → Actions → the workflow run                                 |
 
+
+---
+
+## 🏷️ Debugging barcode-scan misses
+
+**Symptom**: a user scans a barcode and the app shows the "What is this?" (`UnknownBarcodeDialog`) even though the product clearly exists in Open Food Facts.
+
+The scanner reads the digits correctly *and* the server calls the right endpoints — the problem is almost never the barcode library itself. Follow this order:
+
+### Step 1 — Reproduce with the diagnose endpoint
+
+Every barcode-lookup miss can be inspected with the sister endpoint `GET /api/barcode-diagnose?code=<code>`. It queries **every** source in the chain (never short-circuits on first hit) and returns a per-source verdict.
+
+```bash
+curl -H "Authorization: Bearer <your-jwt>" \
+  "https://forkcast-six.vercel.app/api/barcode-diagnose?code=4056489592068" | jq
+```
+
+Example response:
+
+```json
+{
+  "requestedCode": "4056489592068",
+  "variants": ["4056489592068"],
+  "attempts": [
+    { "code": "4056489592068", "source": "off",       "sourceName": "Open Food Facts",     "hit": true,  "durationMs": 234, "product": {...} },
+    { "code": "4056489592068", "source": "obf",       "sourceName": "Open Beauty Facts",   "hit": false, "durationMs": 87 },
+    { "code": "4056489592068", "source": "opf",       "sourceName": "Open Products Facts", "hit": false, "durationMs": 74 },
+    { "code": "4056489592068", "source": "opff",      "sourceName": "Open Pet Food Facts", "hit": false, "durationMs": 65 },
+    { "code": "4056489592068", "source": "upcitemdb", "sourceName": "UPCitemdb (trial)",   "hit": false, "durationMs": 421 }
+  ],
+  "summary": { "anyHit": true, "firstHit": "off", "totalDurationMs": 881 }
+}
+```
+
+Read the `attempts[]` array top-to-bottom:
+
+- **All hits are false** but the product genuinely exists → shared-IP rate limit or network flake. Jump to Step 3.
+- **Open Food Facts says false, sister catalogs true** → we already prefer OFF; make sure the sister DB entry is complete enough to pass our `normaliseProduct` gate (name OR brand required).
+- **UPCitemdb returns `code: "OK"` but `total: 0`** → they simply don't index this SKU. Not a bug; the "teach it once" flow is the correct outcome.
+
+### Step 2 — Compare to a direct upstream call
+
+If diagnose says all sources miss, curl the source directly from your machine:
+
+```bash
+curl "https://world.openfoodfacts.org/api/v2/product/4056489592068.json" | jq .status
+```
+
+- If **your machine** gets `status: 1` but **the server** doesn't, you're being rate-limited on the hosting provider's shared outbound IP. This is the most common failure mode on Vercel because many customers share the same egress IPs and Open Food Facts applies a ~10 req/min per-IP soft limit.
+- If **both** miss, the product truly isn't indexed. Move to Step 4.
+
+### Step 3 — Mitigating shared-IP rate limits
+
+Options in ascending order of effort:
+
+1. **Do nothing** — the "teach once, remember forever" flow (`lib/barcode-cache.js` + `UnknownBarcodeDialog`) already handles this gracefully. The cache is per-device, so a rate-limited scan that becomes a user-taught mapping never has to hit OFF again.
+2. **Add server-side caching** — parking successful OFF responses in Supabase (or KV) for 24h means one hit per barcode per day is enough. See "Future work" in `docs/features/kitchen.md`.
+3. **Pay for API access** — the paid tiers of go-upc / UPCitemdb / Barcode Lookup use dedicated IPs and higher limits. The lookup module already leaves comments for where to slot the keys.
+
+### Step 4 — Recognising GS1 internal-use codes
+
+If the barcode starts with **`02`** or **`20`–`29`**, it's a GS1-reserved *in-store* code. Supermarkets print these locally for deli labels, weighed produce, private markdowns, and their own numbered SKUs. **No public database will ever have them**, and no library / paid key will fix this. The client-side `isInternalStoreCode()` in `lib/barcode-utils.js` detects this and the dialog explains it to the user.
+
+### Step 5 — Adding a new source
+
+Open `lib/barcode-lookup.js` and follow the "ADDING A NEW SOURCE" checklist in the header comment. It's a one-liner in the `SOURCES` array plus a `lookupFoo()` helper. Environments that don't set the key for that source will simply skip it — no branching required at call sites.
+
+### Step 6 — Local reproduction with the dev JWT
+
+Even without a real user account you can hit the endpoints locally:
+
+```js
+// One-off in Node — mint a JWT that the dev fallback secret accepts:
+const jwt = require('jsonwebtoken');
+console.log(jwt.sign(
+  { userId: 'dev-user', username: 'dev' },
+  'dev-only-insecure-secret-do-not-use-in-prod',
+  { expiresIn: '7d' }
+));
+```
+
+Then:
+
+```bash
+curl -H "Authorization: Bearer <token>" \
+  "http://localhost:3000/api/barcode-diagnose?code=4056489592068" | jq
+```
+
+Note: this only works locally because production has a real `JWT_SECRET` in the Vercel env. Production diagnostics need a real user login.
+
+
 ## 🧪 A minimum reproducible bug report
 
 When filing an issue (or asking an AI agent for help), include:
