@@ -25,6 +25,8 @@ import { toast } from 'sonner';
 import { apiGet, apiPost, apiPut, apiDelete } from '@/lib/api-client';
 import { EmptyState } from '@/components/ui/empty-state';
 import BarcodeScanner from '@/components/BarcodeScanner';
+import UnknownBarcodeDialog from '@/components/kitchen/UnknownBarcodeDialog';
+import { getCached, setCached } from '@/lib/barcode-cache';
 
 export default function ShoppingList() {
   const [items, setItems] = useState([]);
@@ -32,6 +34,9 @@ export default function ShoppingList() {
   const [name, setName] = useState('');
   const [generating, setGenerating] = useState(false);
   const [scannerOpen, setScannerOpen] = useState(false);
+  // When an unknown barcode is scanned we stash it here and let the
+  // UnknownBarcodeDialog collect the user's chosen name.
+  const [unknownBarcode, setUnknownBarcode] = useState(null);
 
   const load = async () => {
     setLoading(true);
@@ -106,19 +111,12 @@ export default function ShoppingList() {
   };
 
   /**
-   * Handle a barcode scan while shopping. We resolve the barcode to a
-   * product name (Open Food Facts via /api/barcode-lookup) and then
-   * try to tick off the closest matching item in the list. Fuzzy match
-   * is a simple case-insensitive substring — good enough given users
-   * scan groceries they already added by name.
+   * Given a resolved product name, try to tick off the closest
+   * matching item on the list. Simple case-insensitive substring
+   * match — good enough because users scan groceries they already
+   * added by name.
    */
-  const handleBarcode = async ({ code }) => {
-    const lookup = await apiGet(`/api/barcode-lookup?code=${encodeURIComponent(code)}`);
-    const productName = lookup.ok && lookup.data?.found ? lookup.data.name : null;
-    if (!productName) {
-      toast.warning("Couldn't identify the product. Scan again or tap it manually.");
-      return;
-    }
+  const tickOffByProductName = async (productName) => {
     const target = items.find(
       (i) => !i.checked && (
         i.name.toLowerCase().includes(productName.toLowerCase()) ||
@@ -131,6 +129,63 @@ export default function ShoppingList() {
     }
     await toggle(target);
     toast.success(`Ticked off ${target.name}`);
+  };
+
+  /**
+   * Handle a barcode scan while shopping. Resolution order:
+   *   1. Local IndexedDB cache (either a previous OFF/UPCitemdb hit
+   *      OR a user-taught mapping). Instant, offline-friendly.
+   *   2. /api/barcode-lookup (Open Food Facts → UPCitemdb chain).
+   *   3. If both miss, pop UnknownBarcodeDialog so the user can teach
+   *      us the product name once, and remember it forever.
+   */
+  const handleBarcode = async ({ code }) => {
+    // 1) Try local cache first — this is what makes repeat scans
+    //    instant and lets user-taught mappings work offline.
+    const cached = await getCached(code);
+    if (cached?.name) {
+      await tickOffByProductName(cached.name);
+      return;
+    }
+
+    // 2) Network lookup via the multi-source proxy.
+    const lookup = await apiGet(`/api/barcode-lookup?code=${encodeURIComponent(code)}`);
+    const productName = lookup.ok && lookup.data?.found ? lookup.data.name : null;
+    if (productName) {
+      // Save the hit to the cache so future scans skip the network.
+      await setCached(code, {
+        name: productName,
+        brand: lookup.data.brand || null,
+        image: lookup.data.image || null,
+        quantity: lookup.data.quantity || null,
+        source: lookup.data.source || 'off',
+      });
+      await tickOffByProductName(productName);
+      return;
+    }
+
+    // 3) Unknown — let the user teach us. The dialog will call
+    //    handleUnknownSave (below) with { name, code } once they submit.
+    setUnknownBarcode(code);
+  };
+
+  /** Called from UnknownBarcodeDialog when the user names the product. */
+  const handleUnknownSave = async ({ name: productName, code }) => {
+    // Persist the mapping locally — highest-trust source.
+    await setCached(code, { name: productName, source: 'user' });
+    // Also add it to the shopping list, so the scan wasn't wasted.
+    const res = await apiPost('/api/shopping-list', { name: productName, barcode: code });
+    if (res.ok) {
+      setItems((cur) => [...cur, res.data]);
+      toast.success(`Added ${productName} to your list. Next scan is instant.`);
+    } else {
+      toast.error(res.error?.message || 'Saved locally but could not add to list');
+    }
+  };
+
+  /** Called if the user hits Skip on the unknown-barcode dialog. */
+  const handleUnknownSkip = () => {
+    toast('Skipped — nothing added to the list.');
   };
 
   const remaining = useMemo(() => items.filter((i) => !i.checked), [items]);
@@ -222,6 +277,14 @@ export default function ShoppingList() {
         onOpenChange={setScannerOpen}
         onDetected={handleBarcode}
         title="Scan off your shopping list"
+      />
+
+      <UnknownBarcodeDialog
+        open={!!unknownBarcode}
+        onOpenChange={(next) => { if (!next) setUnknownBarcode(null); }}
+        code={unknownBarcode || ''}
+        onSave={handleUnknownSave}
+        onSkip={handleUnknownSkip}
       />
     </div>
   );

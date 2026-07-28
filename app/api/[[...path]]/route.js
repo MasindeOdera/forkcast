@@ -48,6 +48,101 @@ function validateIsoDate(input) {
   return null;
 }
 
+// ---------------------------------------------------------------------
+// Barcode helpers (shared by /api/barcode-lookup)
+// ---------------------------------------------------------------------
+
+/**
+ * Build the ordered list of code variants to try upstream. Purely
+ * numeric; we do NOT try to compute check digits (too many false
+ * positives, wastes free-tier quota).
+ *
+ * Order = most-likely-canonical first so identical codes hit CDN
+ * caches at Open Food Facts.
+ */
+function buildBarcodeVariants(raw) {
+  const set = new Set();
+  const add = (v) => { if (v) set.add(v); };
+  add(raw);
+  if (/^\d+$/.test(raw)) {
+    if (raw.length === 12) add('0' + raw);             // UPC-A → EAN-13
+    if (raw.length === 13 && raw.startsWith('0')) add(raw.slice(1)); // EAN-13 → UPC-A
+    if (raw.length === 14) add(raw.slice(1));          // GTIN-14 → EAN-13
+    if (raw.length === 8) add('00000' + raw);          // EAN-8 → GTIN-13
+  }
+  return Array.from(set);
+}
+
+/**
+ * Open Food Facts lookup. Returns
+ *   { found: true, name, brand, image, quantity }
+ * on hit, or null on miss / error. Never throws.
+ */
+async function lookupOpenFoodFacts(code) {
+  try {
+    const upstream = await fetch(
+      `https://world.openfoodfacts.org/api/v2/product/${encodeURIComponent(code)}.json?fields=product_name,brands,image_thumb_url,quantity`,
+      {
+        headers: { 'User-Agent': 'Forkcast/1.0 (kitchen barcode lookup)' },
+        // Small timeout — we have another database to try, so don't
+        // let a slow OFF request block the whole request.
+        signal: AbortSignal.timeout(4000),
+      }
+    );
+    if (!upstream.ok) return null;
+    const payload = await upstream.json();
+    if (payload.status !== 1 || !payload.product) return null;
+    const p = payload.product;
+    // Reject empty results — OFF sometimes returns status=1 but every
+    // useful field empty (draft entry with only a photo, etc.).
+    if (!p.product_name && !p.brands) return null;
+    return {
+      found: true,
+      name: p.product_name || null,
+      brand: p.brands || null,
+      image: p.image_thumb_url || null,
+      quantity: p.quantity || null,
+    };
+  } catch (err) {
+    console.warn('OFF lookup failed:', err?.message || err);
+    return null;
+  }
+}
+
+/**
+ * UPCitemdb trial-endpoint lookup. No API key required; the trial
+ * tier is limited to ~100 requests/day per source IP. This covers
+ * many non-food consumer items that Open Food Facts is missing (e.g.
+ * personal care, home goods) and often has European groceries too.
+ */
+async function lookupUpcItemDb(code) {
+  try {
+    const upstream = await fetch(
+      `https://api.upcitemdb.com/prod/trial/lookup?upc=${encodeURIComponent(code)}`,
+      {
+        headers: { 'User-Agent': 'Forkcast/1.0 (kitchen barcode lookup)' },
+        signal: AbortSignal.timeout(4000),
+      }
+    );
+    // 404 = not found; 429 = rate limited today (silently ignore)
+    if (!upstream.ok) return null;
+    const payload = await upstream.json();
+    const item = Array.isArray(payload.items) ? payload.items[0] : null;
+    if (!item) return null;
+    if (!item.title && !item.brand) return null;
+    return {
+      found: true,
+      name: item.title || null,
+      brand: item.brand || null,
+      image: (Array.isArray(item.images) && item.images[0]) || null,
+      quantity: item.size || null,
+    };
+  } catch (err) {
+    console.warn('UPCitemdb lookup failed:', err?.message || err);
+    return null;
+  }
+}
+
 
 export async function GET(request, { params }) {
   try {
@@ -214,48 +309,61 @@ export async function GET(request, { params }) {
     // -----------------------------------------------------------------
     // Kitchen: GET /api/barcode-lookup?code=<barcode>
     // -----------------------------------------------------------------
-    // Server-side proxy to Open Food Facts (https://openfoodfacts.org).
+    // Server-side proxy to a chain of product databases.
+    //
+    //   1. Open Food Facts — https://openfoodfacts.org (no key, food-only)
+    //   2. UPCitemdb trial — https://api.upcitemdb.com/prod/trial/lookup
+    //      (no key, ~100 req/day per IP, covers non-food items too)
+    //
+    // We also try a small list of code *variants* (leading zero add/
+    // strip, GTIN-14 → EAN-13) because real-world Bluetooth scanners
+    // sometimes emit UPC-A codes as 12 digits while the product is
+    // listed as EAN-13, and vice versa.
+    //
+    // The response shape is unchanged:
+    //   { found: true, code, name, brand, image, quantity, source }
+    //   { found: false, code, source: 'none', triedVariants: [...] }
     // We proxy for three reasons:
     //   1. Avoids browser CORS quirks on iOS Safari
-    //   2. Lets us normalise the response shape (name, brand, image)
+    //   2. Lets us normalise the response shape across databases
     //   3. Future-proofs for caching / rate limiting
-    // Open Food Facts requires no API key and has ~3M food products.
     if (path === 'barcode-lookup') {
       const user = getUserFromToken(request);
       if (!user) {
         return withCors(NextResponse.json({ error: 'Unauthorized' }, { status: 401 }));
       }
-      const code = url.searchParams.get('code');
-      if (!code || !/^\d{6,14}$/.test(code)) {
+      const rawCode = url.searchParams.get('code');
+      if (!rawCode || !/^\d{6,14}$/.test(rawCode)) {
         return withCors(NextResponse.json({ error: 'Invalid barcode' }, { status: 400 }));
       }
-      try {
-        const upstream = await fetch(
-          `https://world.openfoodfacts.org/api/v2/product/${encodeURIComponent(code)}.json?fields=product_name,brands,image_thumb_url,quantity`,
-          { headers: { 'User-Agent': 'Forkcast/1.0 (kitchen barcode lookup)' } }
-        );
-        if (!upstream.ok) {
-          return withCors(NextResponse.json({ found: false, code }, { status: 200 }));
+
+      // Build a small ordered list of variants to try. Keep the caller-
+      // provided form first so identical codes hit any upstream caches.
+      const tried = [];
+      const variants = buildBarcodeVariants(rawCode);
+      for (const code of variants) {
+        tried.push(code);
+        // --- Try Open Food Facts ------------------------------------
+        const off = await lookupOpenFoodFacts(code);
+        if (off?.found) {
+          return withCors(NextResponse.json({ ...off, code, requestedCode: rawCode, source: 'off', triedVariants: tried }));
         }
-        const payload = await upstream.json();
-        if (payload.status !== 1 || !payload.product) {
-          return withCors(NextResponse.json({ found: false, code }, { status: 200 }));
+        // --- Try UPCitemdb (covers non-food + broader UPC catalog) --
+        const upc = await lookupUpcItemDb(code);
+        if (upc?.found) {
+          return withCors(NextResponse.json({ ...upc, code, requestedCode: rawCode, source: 'upcitemdb', triedVariants: tried }));
         }
-        const p = payload.product;
-        return withCors(NextResponse.json({
-          found: true,
-          code,
-          name: p.product_name || null,
-          brand: p.brands || null,
-          image: p.image_thumb_url || null,
-          quantity: p.quantity || null,
-        }));
-      } catch (err) {
-        console.error('Barcode lookup error:', err);
-        // Never fail the client on lookup errors \u2014 they should still
-        // be able to add the item manually.
-        return withCors(NextResponse.json({ found: false, code, error: 'lookup_failed' }, { status: 200 }));
       }
+
+      // Nothing found anywhere. Return 200 so the client can gracefully
+      // prompt the user to name it — never fail the request.
+      return withCors(NextResponse.json({
+        found: false,
+        code: rawCode,
+        requestedCode: rawCode,
+        source: 'none',
+        triedVariants: tried,
+      }));
     }
 
     return withCors(NextResponse.json({ error: 'Not found' }, { status: 404 }));

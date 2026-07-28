@@ -33,6 +33,8 @@ import { Input } from '@/components/ui/input';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Camera, Keyboard, Loader2, AlertTriangle } from 'lucide-react';
 import { scanOnce, detectStrategy } from '@/lib/native/scanner';
+import { normalizeBarcode } from '@/lib/barcode-utils';
+import ScanConfirmDialog from '@/components/kitchen/ScanConfirmDialog';
 
 export default function BarcodeScanner({
   open,
@@ -40,6 +42,10 @@ export default function BarcodeScanner({
   onDetected,
   title = 'Scan a barcode',
   allowManual = true,
+  // When true, show a confirm step after any scan (camera or HID)
+  // so the user can verify / fix digits before we hit the API. Manual
+  // typed entry skips confirm since the user already typed it.
+  confirmBeforeSubmit = true,
 }) {
   const videoRef = useRef(null);
   const abortRef = useRef(null);
@@ -48,6 +54,22 @@ export default function BarcodeScanner({
   const [error, setError] = useState(null);
   const [manualCode, setManualCode] = useState('');
   const [tab, setTab] = useState('camera');
+  // Two-phase detection: when a scan succeeds we stash the code here
+  // and pop the confirm dialog (unless confirmBeforeSubmit=false).
+  const [pendingCode, setPendingCode] = useState(null);
+  const [pendingFormat, setPendingFormat] = useState('unknown');
+
+  const emitDetection = (rawCode, format) => {
+    const code = normalizeBarcode(rawCode);
+    if (!code) return;
+    if (confirmBeforeSubmit) {
+      setPendingCode(code);
+      setPendingFormat(format || 'unknown');
+    } else {
+      onDetected?.({ code, format: format || 'unknown' });
+      onOpenChange?.(false);
+    }
+  };
 
   // ---- Strategy detection (client-only) ----------------------------
   useEffect(() => {
@@ -102,8 +124,7 @@ export default function BarcodeScanner({
         });
         setBusy(false);
         if (result && !cancelled()) {
-          onDetected?.(result);
-          onOpenChange?.(false);
+          emitDetection(result.code, result.format);
         }
       } catch (err) {
         if (cancelled()) return;
@@ -131,8 +152,7 @@ export default function BarcodeScanner({
     try {
       const result = await scanOnce();
       if (result) {
-        onDetected?.(result);
-        onOpenChange?.(false);
+        emitDetection(result.code, result.format);
       } else {
         onOpenChange?.(false);
       }
@@ -158,10 +178,27 @@ export default function BarcodeScanner({
 
   const submitManual = (e) => {
     e?.preventDefault?.();
-    const code = manualCode.trim();
+    const code = normalizeBarcode(manualCode);
     if (!code) return;
+    // Manual entry is already user-verified, so skip the extra confirm
+    // step and hand off directly.
     onDetected?.({ code, format: 'manual' });
     setManualCode('');
+    onOpenChange?.(false);
+  };
+
+  // When the confirm-dialog closes without confirming (e.g. user hit
+  // Rescan or dismissed), drop back into the camera scan loop.
+  const clearPending = () => {
+    setPendingCode(null);
+    setPendingFormat('unknown');
+  };
+
+  const confirmPending = (finalCode) => {
+    const normalized = normalizeBarcode(finalCode);
+    if (!normalized) return;
+    onDetected?.({ code: normalized, format: pendingFormat });
+    clearPending();
     onOpenChange?.(false);
   };
 
@@ -245,6 +282,23 @@ export default function BarcodeScanner({
           )}
         </Tabs>
       </DialogContent>
+
+      {/* Verify-scanned-code step. Only appears after a successful
+          camera / native scan when confirmBeforeSubmit is on. Manual
+          typed entry bypasses this because the user already typed it. */}
+      <ScanConfirmDialog
+        open={!!pendingCode}
+        onOpenChange={(next) => { if (!next) clearPending(); }}
+        code={pendingCode || ''}
+        onConfirm={confirmPending}
+        onRescan={() => {
+          // Kick the scanner effect back on by leaving the dialog open
+          // and re-mounting the video element. Simplest way: bump tab
+          // to force a re-run of the effect that reads it.
+          setError(null);
+          setBusy(false);
+        }}
+      />
     </Dialog>
   );
 }

@@ -23,6 +23,8 @@ import { toast } from 'sonner';
 import { apiGet, apiPost, apiDelete } from '@/lib/api-client';
 import { EmptyState } from '@/components/ui/empty-state';
 import BarcodeScanner from '@/components/BarcodeScanner';
+import UnknownBarcodeDialog from '@/components/kitchen/UnknownBarcodeDialog';
+import { getCached, setCached } from '@/lib/barcode-cache';
 
 export default function Pantry() {
   const [items, setItems] = useState([]);
@@ -30,6 +32,7 @@ export default function Pantry() {
   const [name, setName] = useState('');
   const [expiresAt, setExpiresAt] = useState('');
   const [scannerOpen, setScannerOpen] = useState(false);
+  const [unknownBarcode, setUnknownBarcode] = useState(null);
 
   const load = async () => {
     setLoading(true);
@@ -73,22 +76,48 @@ export default function Pantry() {
     setExpiresAt('');
   };
 
-  // Handler for the barcode scanner — look up the product name via our
-  // /api/barcode-lookup proxy, then add it to the pantry.
+  // Handler for the barcode scanner — resolution order matches
+  // ShoppingList: cache → /api/barcode-lookup → UnknownBarcodeDialog.
   const handleBarcode = async ({ code }) => {
+    // 1) Local cache (previous hits + user-taught mappings).
+    const cached = await getCached(code);
+    if (cached?.name) {
+      addItem({ name: cached.name, barcode: code });
+      return;
+    }
+    // 2) Multi-source network lookup.
     const res = await apiGet(`/api/barcode-lookup?code=${encodeURIComponent(code)}`);
-    if (res.ok && res.data?.found) {
-      addItem({
-        name: res.data.name || `Item ${code}`,
-        barcode: code,
+    if (res.ok && res.data?.found && res.data.name) {
+      // Cache for next time.
+      await setCached(code, {
+        name: res.data.name,
+        brand: res.data.brand || null,
+        image: res.data.image || null,
+        quantity: res.data.quantity || null,
+        source: res.data.source || 'off',
       });
-    } else {
-      // Fallback — add with just the barcode; user can rename later.
-      addItem({
-        name: `Barcode ${code}`,
-        barcode: code,
-      });
-      toast('We couldn\u2019t find this product. Added with barcode only — tap the item to rename.');
+      addItem({ name: res.data.name, barcode: code });
+      return;
+    }
+    // 3) Nothing found — ask the user to name it. If they Skip,
+    //    we still fall back to adding "Barcode <code>" so the scan
+    //    isn't lost.
+    setUnknownBarcode(code);
+  };
+
+  /** Called when the user names an unknown barcode in the dialog. */
+  const handleUnknownSave = async ({ name: productName, code }) => {
+    await setCached(code, { name: productName, source: 'user' });
+    await addItem({ name: productName, barcode: code });
+  };
+
+  /** Called if the user hits Skip on the unknown-barcode dialog. */
+  const handleUnknownSkip = () => {
+    // Preserve prior behaviour: still add the scan so the user can
+    // rename later, but be explicit about the placeholder name.
+    if (unknownBarcode) {
+      addItem({ name: `Barcode ${unknownBarcode}`, barcode: unknownBarcode });
+      toast('Added with barcode only — tap the item to rename.');
     }
   };
 
@@ -190,6 +219,14 @@ export default function Pantry() {
         onOpenChange={setScannerOpen}
         onDetected={handleBarcode}
         title="Scan into pantry"
+      />
+
+      <UnknownBarcodeDialog
+        open={!!unknownBarcode}
+        onOpenChange={(next) => { if (!next) setUnknownBarcode(null); }}
+        code={unknownBarcode || ''}
+        onSave={handleUnknownSave}
+        onSkip={handleUnknownSkip}
       />
     </div>
   );
