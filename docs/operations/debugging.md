@@ -220,6 +220,16 @@ The same endpoint is pinged by our GitHub Actions cron every ~3 days to prevent 
 
 The scanner reads the digits correctly *and* the server calls the right endpoints — the problem is almost never the barcode library itself. Follow this order:
 
+### Step 0 — Rule out the three client-side gotchas
+
+Since Jul 2026 the client (`components/kitchen/ShoppingList.js`, `components/kitchen/Pantry.js`) distinguishes three outcomes and only the last one opens the `UnknownBarcodeDialog`. If a user reports "the scanner doesn't recognize this product", make sure you know which of the three fired:
+
+- **HTTP failure** (5xx / network / rate-limit) → `toast.error` "Product lookup service is unavailable…". This should **never** open the dialog anymore.
+- **Genuine hit with brand-only** (`{ found: true, name: null, brand: "Crownfield" }`) → we now fall back to the brand as `productName`. Older clients (pre-fix) treated this as unknown — if you see this happening again, look for that regression first.
+- **Genuine miss** (`{ found: false }`) → dialog opens. Correct behaviour.
+
+Turn on `NEXT_PUBLIC_DEBUG_BARCODE=1` (or flip the `DEBUG_BARCODE` const at the top of each Kitchen component) to mirror `[barcode]` scan/lookup logs to the browser console.
+
 ### Step 1 — Reproduce with the diagnose endpoint
 
 Every barcode-lookup miss can be inspected with the sister endpoint `GET /api/barcode-diagnose?code=<code>`. It queries **every** source in the chain (never short-circuits on first hit) and returns a per-source verdict.

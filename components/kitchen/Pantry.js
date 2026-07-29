@@ -26,6 +26,12 @@ import BarcodeScanner from '@/components/BarcodeScanner';
 import UnknownBarcodeDialog from '@/components/kitchen/UnknownBarcodeDialog';
 import { getCached, setCached } from '@/lib/barcode-cache';
 
+// Dev flag — flip to `true` (or set NEXT_PUBLIC_DEBUG_BARCODE=1) to
+// mirror every scan resolution to the browser console. Handy for
+// diagnosing "the scanner didn't recognize this item" reports.
+const DEBUG_BARCODE = typeof process !== 'undefined'
+  && process.env?.NEXT_PUBLIC_DEBUG_BARCODE === '1';
+
 export default function Pantry() {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -78,27 +84,55 @@ export default function Pantry() {
 
   // Handler for the barcode scanner — resolution order matches
   // ShoppingList: cache → /api/barcode-lookup → UnknownBarcodeDialog.
+  //
+  // Error-handling contract (added Jul 2026):
+  //   - HTTP failure (5xx / network / rate-limit) → toast.error and stop.
+  //     We do NOT open UnknownBarcodeDialog on a transient failure,
+  //     because that trained users to teach us wrong names (fixes the
+  //     "scanner didn't recognize a well-known product" class of bug).
+  //   - Hit with brand-only (name === null) → treat brand as the name.
   const handleBarcode = async ({ code }) => {
+    if (DEBUG_BARCODE) console.log('[barcode] scan received:', code);
+
     // 1) Local cache (previous hits + user-taught mappings).
     const cached = await getCached(code);
     if (cached?.name) {
+      if (DEBUG_BARCODE) console.log('[barcode] cache hit:', cached);
       addItem({ name: cached.name, barcode: code });
       return;
     }
     // 2) Multi-source network lookup.
     const res = await apiGet(`/api/barcode-lookup?code=${encodeURIComponent(code)}`);
-    if (res.ok && res.data?.found && res.data.name) {
-      // Cache for next time.
-      await setCached(code, {
-        name: res.data.name,
-        brand: res.data.brand || null,
-        image: res.data.image || null,
-        quantity: res.data.quantity || null,
-        source: res.data.source || 'off',
-      });
-      addItem({ name: res.data.name, barcode: code });
+    if (DEBUG_BARCODE) console.log('[barcode] lookup response:', res);
+
+    // 2a) Distinguish an HTTP failure from a genuine miss — the "teach
+    //     me" dialog is only for actual misses, not transient outages.
+    if (!res.ok) {
+      toast.error(
+        res.error?.message
+          || 'Product lookup service is unavailable right now. Please try again in a moment.'
+      );
       return;
     }
+
+    // 2b) Genuine hit? Accept name OR brand — some Open Food Facts
+    //     entries populate only one.
+    if (res.data?.found) {
+      const productName = res.data.name || res.data.brand;
+      if (productName) {
+        await setCached(code, {
+          name: productName,
+          brand: res.data.brand || null,
+          image: res.data.image || null,
+          quantity: res.data.quantity || null,
+          source: res.data.source || 'off',
+        });
+        addItem({ name: productName, barcode: code });
+        return;
+      }
+      console.warn('[barcode] hit had neither name nor brand:', res.data);
+    }
+
     // 3) Nothing found — ask the user to name it. If they Skip,
     //    we still fall back to adding "Barcode <code>" so the scan
     //    isn't lost.

@@ -10,8 +10,15 @@
  *     which walks the week's meal_plans and aggregates ingredients.
  *   - Tick items manually or by scanning a barcode. A scanned code is
  *     resolved via /api/barcode-lookup; we then fuzzy-match the product
- *     name against uncchecked list items and tick the closest one.
+ *     name against unchecked list items and tick the closest one. If
+ *     nothing matches, we add the product to the list so no scan is
+ *     ever silently discarded.
  *   - "Clear checked" removes finished items in one tap.
+ *
+ * Barcode failure modes (see handleBarcode for details):
+ *   - transient lookup error → toast, list unchanged
+ *   - genuine miss           → open UnknownBarcodeDialog for one-time
+ *                              teach-then-remember
  */
 
 import { useEffect, useMemo, useState } from 'react';
@@ -27,6 +34,13 @@ import { EmptyState } from '@/components/ui/empty-state';
 import BarcodeScanner from '@/components/BarcodeScanner';
 import UnknownBarcodeDialog from '@/components/kitchen/UnknownBarcodeDialog';
 import { getCached, setCached } from '@/lib/barcode-cache';
+
+// Dev flag — flip to `true` (or set NEXT_PUBLIC_DEBUG_BARCODE=1) to
+// mirror every scan resolution to the browser console. Handy for
+// diagnosing "the scanner said it didn't recognize this item" reports
+// where the user swears the barcode is a known product.
+const DEBUG_BARCODE = typeof process !== 'undefined'
+  && process.env?.NEXT_PUBLIC_DEBUG_BARCODE === '1';
 
 export default function ShoppingList() {
   const [items, setItems] = useState([]);
@@ -114,9 +128,11 @@ export default function ShoppingList() {
    * Given a resolved product name, try to tick off the closest
    * matching item on the list. Simple case-insensitive substring
    * match — good enough because users scan groceries they already
-   * added by name.
+   * added by name. If nothing matches, we ADD the item to the list
+   * so the scan is never wasted (fixes a class of "I scanned it and
+   * nothing happened" reports).
    */
-  const tickOffByProductName = async (productName) => {
+  const tickOffByProductName = async (productName, { code = null } = {}) => {
     const target = items.find(
       (i) => !i.checked && (
         i.name.toLowerCase().includes(productName.toLowerCase()) ||
@@ -124,7 +140,20 @@ export default function ShoppingList() {
       )
     );
     if (!target) {
-      toast(`Scanned ${productName} — not on your list. Tap +Add if you want it.`);
+      // Not on the list yet — add it so the user sees an obvious
+      // outcome. Better UX than the old silent "not on your list" toast
+      // which users often misread as "the scanner didn't recognize
+      // this item".
+      const res = await apiPost('/api/shopping-list', {
+        name: productName,
+        ...(code ? { barcode: code } : {}),
+      });
+      if (res.ok) {
+        setItems((cur) => [...cur, res.data]);
+        toast.success(`Added ${productName} to your list`);
+      } else {
+        toast.error(res.error?.message || `Recognised ${productName}, but could not add it to your list.`);
+      }
       return;
     }
     await toggle(target);
@@ -135,33 +164,66 @@ export default function ShoppingList() {
    * Handle a barcode scan while shopping. Resolution order:
    *   1. Local IndexedDB cache (either a previous OFF/UPCitemdb hit
    *      OR a user-taught mapping). Instant, offline-friendly.
-   *   2. /api/barcode-lookup (Open Food Facts → UPCitemdb chain).
+   *   2. /api/barcode-lookup (Open Food Facts family + UPCitemdb chain
+   *      — see lib/barcode-lookup.js).
    *   3. If both miss, pop UnknownBarcodeDialog so the user can teach
    *      us the product name once, and remember it forever.
+   *
+   * Error-handling contract (added Jul 2026):
+   *   - lookup HTTP failure  → toast.error, do NOT open the "What is
+   *     this?" dialog (that dialog is for genuine misses, not for
+   *     transient network / rate-limit issues).
+   *   - lookup returns found:true with brand-only (name === null) →
+   *     use brand as productName. Previously we treated this as
+   *     unknown, which was the bug behind "the scanner doesn't
+   *     recognize this well-known product" reports.
    */
   const handleBarcode = async ({ code }) => {
+    if (DEBUG_BARCODE) console.log('[barcode] scan received:', code);
+
     // 1) Try local cache first — this is what makes repeat scans
     //    instant and lets user-taught mappings work offline.
     const cached = await getCached(code);
     if (cached?.name) {
-      await tickOffByProductName(cached.name);
+      if (DEBUG_BARCODE) console.log('[barcode] cache hit:', cached);
+      await tickOffByProductName(cached.name, { code });
       return;
     }
 
     // 2) Network lookup via the multi-source proxy.
     const lookup = await apiGet(`/api/barcode-lookup?code=${encodeURIComponent(code)}`);
-    const productName = lookup.ok && lookup.data?.found ? lookup.data.name : null;
-    if (productName) {
-      // Save the hit to the cache so future scans skip the network.
-      await setCached(code, {
-        name: productName,
-        brand: lookup.data.brand || null,
-        image: lookup.data.image || null,
-        quantity: lookup.data.quantity || null,
-        source: lookup.data.source || 'off',
-      });
-      await tickOffByProductName(productName);
+    if (DEBUG_BARCODE) console.log('[barcode] lookup response:', lookup);
+
+    // 2a) Distinguish an HTTP failure from a genuine miss. A 5xx or
+    //     network error is NOT the user's fault and should not push
+    //     them into the "teach me" dialog.
+    if (!lookup.ok) {
+      toast.error(
+        lookup.error?.message
+          || 'Product lookup service is unavailable right now. Please try again in a moment.'
+      );
       return;
+    }
+
+    // 2b) Genuine hit? Accept name OR brand — some Open Food Facts
+    //     entries have only one populated.
+    if (lookup.data?.found) {
+      const productName = lookup.data.name || lookup.data.brand;
+      if (productName) {
+        // Save the hit to the cache so future scans skip the network.
+        await setCached(code, {
+          name: productName,
+          brand: lookup.data.brand || null,
+          image: lookup.data.image || null,
+          quantity: lookup.data.quantity || null,
+          source: lookup.data.source || 'off',
+        });
+        await tickOffByProductName(productName, { code });
+        return;
+      }
+      // Very rare: source claimed a hit but had neither name nor brand.
+      // Log for triage and fall through to the "teach me" dialog.
+      console.warn('[barcode] hit had neither name nor brand:', lookup.data);
     }
 
     // 3) Unknown — let the user teach us. The dialog will call

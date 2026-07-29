@@ -25,9 +25,14 @@ suggestions respect what you can actually cook right now.
   `POST /api/shopping-list`.
 - **Tick off items** — `PUT /api/shopping-list/:id` with `{ checked: true }`.
   Ticked items collapse to the bottom of the list with a strikethrough.
-- **Scan to tick off** — the scanner resolves the barcode via
-  `GET /api/barcode-lookup?code=...` (Open Food Facts) and fuzzy-matches
-  the product name against unchecked items.
+- **Scan to add or tick off** — the scanner resolves the barcode via
+  `GET /api/barcode-lookup?code=...` (Open Food Facts family +
+  UPCitemdb chain) and fuzzy-matches the product name against
+  unchecked items. If a scanned product is *not yet* on the list, we
+  add it automatically so the scan is never wasted. If the lookup
+  service itself fails (5xx / network / rate-limit), the client shows
+  a toast rather than treating the transient failure as a genuine
+  miss.
 - **Clear checked** — `DELETE /api/shopping-list?checked=true`.
 
 ### Pantry (`components/kitchen/Pantry.js`)
@@ -142,9 +147,12 @@ The client-side flow (`components/kitchen/ShoppingList.js`,
 `components/kitchen/Pantry.js`) already does the right thing in all
 three cases via `lib/barcode-cache.js`:
 
-- Cache hit? → zero network, instant match.
-- API hit?   → cache + use.
-- Miss?      → open `UnknownBarcodeDialog`, save the taught mapping
+- Cache hit?   → zero network, instant match.
+- API hit?     → cache + use. Accepts `name` **or** `brand` as the
+  product name (Open Food Facts sometimes populates only one).
+- API failure? → toast the user; do **not** open UnknownBarcodeDialog.
+  Transient failures should never train users to teach wrong names.
+- Miss?        → open `UnknownBarcodeDialog`, save the taught mapping
   under `source: 'user'` (highest trust — never overwritten by later
   external lookups).
 
