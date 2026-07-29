@@ -65,6 +65,36 @@ Items on the user's shopping list. Added in `db/migrations/002_kitchen.sql`.
 | `source_meal_id` | `uuid` FK null| → `meals.id` (set null on delete). Traces the item back to the recipe that produced it during a shopping list generation. |
 | `added_at`       | `timestamptz` |                                              |
 
+## `barcode_cache`  <sub>(Kitchen feature)</sub>
+
+Shared, cross-user cache of barcode → product lookups. Added in
+`db/migrations/003_barcode_cache.sql`. Motivation: Open Food Facts
+frequently rate-limits Vercel's shared outbound IP, so **cold** scans
+that "work in tests" fail in production. Once *any* user has scanned a
+code, every subsequent scan by any user resolves in ~30ms from
+Postgres without ever touching OFF.
+
+Unlike other Kitchen tables, `barcode_cache` is **not** per-user — a
+barcode → product mapping is universal knowledge and safe to share
+across accounts.
+
+| Column       | Type          | Notes                                                                                     |
+|--------------|---------------|-------------------------------------------------------------------------------------------|
+| `code`       | `text` PK     | Normalised barcode digits (leading zeros trimmed for GTIN-14, etc)                        |
+| `found`      | `boolean`     | Did the upstream chain identify this product?                                             |
+| `name`       | `text` null   | Product name (nullable — some OFF entries have only a brand)                              |
+| `brand`      | `text` null   | Brand string                                                                              |
+| `image`      | `text` null   | Thumbnail URL                                                                             |
+| `quantity`   | `text` null   | e.g. `900 g`, `1 L`                                                                       |
+| `source`     | `text`        | Which upstream populated the row: `off` / `obf` / `opf` / `opff` / `upcitemdb` / `none`   |
+| `cached_at`  | `timestamptz` | When we wrote this row                                                                    |
+| `expires_at` | `timestamptz` | Reads treat rows with `expires_at ≤ now()` as misses. 30d for hits, 7d for `found=false`. |
+
+Runtime: reads via `db.barcode_cache.getFresh(code)`, writes via
+`db.barcode_cache.upsert({...})`, manual invalidation via
+`db.barcode_cache.invalidate(code)` (also exposed as
+`DELETE /api/barcode-cache?code=…`).
+
 ## Relationships
 
 ```
@@ -73,6 +103,8 @@ users (1) ────< meals
   ├────< meal_plans >──── meals
   ├────< pantry_items
   └────< shopping_list_items >──── meals (nullable)
+
+barcode_cache  (global, no FKs — shared reference data)
 ```
 
 - A user has many meals (`meals.user_id → users.id`).
@@ -80,5 +112,9 @@ users (1) ────< meals
 - Pantry items and shopping list items are per-user.
 - Shopping list items **may** be traced back to the meal they came from
   via `source_meal_id` (nullable so manually-added items are OK).
+- `barcode_cache` is standalone: no user link, no meal link. It's a
+  read-mostly reference table maintained by the kitchen scanner and
+  safe to inspect / truncate at any time (worst case: the next few
+  scans re-populate it from Open Food Facts).
 
 See [operations/debugging.md](./debugging.md) for how to inspect and edit this data.

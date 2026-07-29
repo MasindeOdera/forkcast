@@ -237,8 +237,14 @@ export async function GET(request, { params }) {
       if (!rawCode || !/^\d{6,14}$/.test(rawCode)) {
         return withCors(NextResponse.json({ error: 'Invalid barcode' }, { status: 400 }));
       }
-      console.log(`[barcode] lookup ${rawCode}`);
-      const result = await runLookupChain(rawCode);
+      // ?bypassCache=1 forces a cold upstream lookup, bypassing (and
+      // NOT writing back to) the Supabase barcode_cache. Useful when a
+      // user reports a stale-cache incident and you want to see what
+      // Open Food Facts is returning right now. Requires auth so it
+      // can't be used to melt our OFF quota anonymously.
+      const bypassCache = url.searchParams.get('bypassCache') === '1';
+      console.log(`[barcode] lookup ${rawCode}${bypassCache ? ' (bypassCache)' : ''}`);
+      const result = await runLookupChain(rawCode, { bypassCache });
       return withCors(NextResponse.json(result));
     }
 
@@ -818,6 +824,7 @@ export async function DELETE(request, { params }) {
   try {
     const { db } = await connectToDatabase();
     const path = params.path?.join('/') || '';
+    const url = new URL(request.url);
     const user = getUserFromToken(request);
     
     if (!user) {
@@ -931,6 +938,25 @@ export async function DELETE(request, { params }) {
         return withCors(NextResponse.json({ error: 'Item not found' }, { status: 404 }));
       }
       return withCors(NextResponse.json({ message: 'Item removed' }));
+    }
+
+    // -----------------------------------------------------------------
+    // Kitchen: DELETE /api/barcode-cache?code=<code>
+    // -----------------------------------------------------------------
+    // Manual cache invalidation. Any logged-in user can nuke a bad
+    // cache entry — the cache is shared, so this benefits everyone.
+    // Called by the client from UnknownBarcodeDialog's "Report bad
+    // data" affordance (see components/kitchen/UnknownBarcodeDialog.js)
+    // and by ops from a shell one-liner. No `code` param → no-op 400
+    // to prevent accidentally wiping the whole table.
+    if (path === 'barcode-cache') {
+      const code = url.searchParams.get('code');
+      if (!code || !/^\d{6,14}$/.test(code)) {
+        return withCors(NextResponse.json({ error: 'Invalid barcode' }, { status: 400 }));
+      }
+      await db.collection('barcode_cache').invalidate(code);
+      console.log(`[barcode] cache invalidated for ${code} by user ${user.userId}`);
+      return withCors(NextResponse.json({ invalidated: code }));
     }
 
     return withCors(NextResponse.json({ error: 'Not found' }, { status: 404 }));

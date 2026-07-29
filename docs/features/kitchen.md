@@ -72,8 +72,10 @@ scoped by `user_id` at the query level.
 
 ## Database (Supabase / Postgres)
 
-Added in `db/migrations/002_kitchen.sql`, also present in `db/schema.sql`.
-See `docs/operations/database-schema.md` for the full table map.
+Added in `db/migrations/002_kitchen.sql` (pantry + shopping list) and
+`db/migrations/003_barcode_cache.sql` (server-side scanner cache).
+Also present in `db/schema.sql`. See
+`docs/operations/database-schema.md` for the full table map.
 
 ```sql
 create table public.pantry_items (
@@ -83,9 +85,15 @@ create table public.pantry_items (
 create table public.shopping_list_items (
     id, user_id, name, checked, source_meal_id, added_at
 );
+
+-- Cross-user cache backing the scanner. Not user-scoped: a barcode →
+-- product mapping is universal knowledge.
+create table public.barcode_cache (
+    code, found, name, brand, image, quantity, source, cached_at, expires_at
+);
 ```
 
-Both tables have RLS enabled + forced with no permissive policies
+All three tables have RLS enabled + forced with no permissive policies
 (default-deny), matching the existing security posture. The server
 accesses them with the service role which bypasses RLS.
 
@@ -109,11 +117,22 @@ BLE HID scanners "just work" by focusing that input.
 
 ## Product-database chain
 
-Barcode-to-product resolution is a **multi-source fallback chain** — see
-`lib/barcode-lookup.js` and the runbook in `docs/operations/debugging.md`.
+Barcode-to-product resolution is a **two-layer cache + multi-source
+fallback chain**. See `lib/barcode-lookup.js` and the runbook in
+`docs/operations/debugging.md`.
 
-Sources are queried in order and the first hit wins. All sources are
-free and require no API key.
+The resolution order for a single scan is:
+
+1. **Client-side IndexedDB cache** (`lib/barcode-cache.js`) — instant,
+   offline-friendly, includes user-taught mappings. Zero network.
+2. **Server-side Supabase cache** (`barcode_cache` table, migration 003)
+   — shared across all users, ~30ms Postgres read. Both hits and
+   misses are cached (30-day TTL for hits, 7-day for misses).
+3. **Upstream chain** — only reached on a full cache miss. Sources are
+   queried in order and the first hit wins. All are free, no API key.
+4. **UnknownBarcodeDialog** — genuine miss; user teaches us once.
+
+Upstream sources (step 3):
 
 | Order | Source                         | Coverage                              |
 |-------|--------------------------------|---------------------------------------|
@@ -129,12 +148,17 @@ Each source is called with:
 - One automatic retry with exponential backoff on 5xx / network error.
 - A meaningful `User-Agent` (Open Food Facts policy asks for one).
 
-The three most common reasons a scan misses even when the product
-exists:
+The three most common reasons a **cold** scan misses even when the
+product exists:
 
 1. **Shared-IP rate limits** — Vercel serverless functions share
    outbound IPs across many customers, so Open Food Facts occasionally
-   returns 429 to our region.
+   returns 429 to our region. The **server-side cache eliminates this
+   for repeat scans**: after any single user resolves a barcode
+   successfully, every subsequent scan of that code across all users
+   skips the network entirely. If you're diagnosing a first-time cold
+   miss, see the debugging runbook for `?bypassCache=1` + cache
+   invalidation.
 2. **Cold-start timeout** — first request after idle can breach 8s if
    the upstream is also slow.
 3. **GS1-reserved in-store codes** — any barcode with prefix `02` or
@@ -147,14 +171,16 @@ The client-side flow (`components/kitchen/ShoppingList.js`,
 `components/kitchen/Pantry.js`) already does the right thing in all
 three cases via `lib/barcode-cache.js`:
 
-- Cache hit?   → zero network, instant match.
-- API hit?     → cache + use. Accepts `name` **or** `brand` as the
-  product name (Open Food Facts sometimes populates only one).
-- API failure? → toast the user; do **not** open UnknownBarcodeDialog.
+- Client cache hit?  → zero network, instant match.
+- Server cache hit?  → ~30ms Postgres round-trip, then cached client-side.
+- API hit?           → cached at *both* layers + used. Accepts `name`
+  **or** `brand` as the product name (OFF sometimes populates only one).
+- API failure?       → toast the user; do **not** open UnknownBarcodeDialog.
   Transient failures should never train users to teach wrong names.
-- Miss?        → open `UnknownBarcodeDialog`, save the taught mapping
-  under `source: 'user'` (highest trust — never overwritten by later
-  external lookups).
+  401s trigger the global auto-logout listener (see `app/page.js`).
+- Miss?              → open `UnknownBarcodeDialog`, save the taught
+  mapping under `source: 'user'` (highest trust — never overwritten by
+  later external lookups).
 
 ### Adding another source
 

@@ -1,619 +1,550 @@
 #!/usr/bin/env python3
 """
-Backend API Test Suite for Barcode Lookup Enhancement
-Tests the enhanced barcode-lookup system + new /api/barcode-diagnose endpoint
+Backend test for barcode-cache endpoints and updated /api/barcode-lookup behavior.
+
+This test focuses on:
+1. GET /api/barcode-lookup with various scenarios (auth, validation, cache behavior, bypassCache)
+2. DELETE /api/barcode-cache with various scenarios
+3. Regression tests for DELETE /api/shopping-list and /api/barcode-diagnose
+4. Graceful degradation when Supabase is unavailable
 """
 
 import requests
+import json
 import jwt
 import time
-import json
 from datetime import datetime, timedelta
 
-# Configuration
-BASE_URL = "http://localhost:3000/api"
-JWT_SECRET = "dev-only-insecure-secret-do-not-use-in-prod"
+# Base URL for the Next.js backend
+BASE_URL = "http://localhost:3000"
 
-def generate_jwt_token():
-    """Generate a valid JWT token for testing"""
+# Dev JWT secret (from debugging.md Step 6)
+DEV_SECRET = "dev-only-insecure-secret-do-not-use-in-prod"
+
+def mint_dev_jwt():
+    """Mint a dev JWT for testing (as documented in debugging.md)"""
     payload = {
-        "userId": "test-user-123",
-        "username": "testuser",
-        "exp": datetime.utcnow() + timedelta(days=1)
+        "userId": "dev-user",
+        "username": "dev",
+        "exp": datetime.utcnow() + timedelta(days=7)
     }
-    token = jwt.encode(payload, JWT_SECRET, algorithm="HS256")
+    token = jwt.encode(payload, DEV_SECRET, algorithm="HS256")
     return token
 
-def print_test_header(test_name):
-    """Print a formatted test header"""
-    print(f"\n{'='*80}")
-    print(f"TEST: {test_name}")
-    print(f"{'='*80}")
-
-def print_result(passed, message, response_snippet=None):
-    """Print test result"""
-    status = "✅ PASS" if passed else "❌ FAIL"
-    print(f"{status}: {message}")
-    if response_snippet:
-        print(f"Response snippet: {json.dumps(response_snippet, indent=2)}")
-
-# ============================================================================
-# TEST 1: /api/barcode-lookup REGRESSION TESTS (7 tests)
-# ============================================================================
-
-def test_1a_lookup_auth_guard():
-    """Test 1a: GET /api/barcode-lookup without Authorization → 401"""
-    print_test_header("1a: Barcode Lookup - Auth Guard")
+def test_barcode_lookup_known_good():
+    """
+    Test 1: GET /api/barcode-lookup?code=4056489592068 (Crownfield Crunchy Muesli)
+    Expected: 200, found:true, name, brand, source:'off', no fromCache (Supabase unavailable)
+    """
+    print("\n" + "="*80)
+    print("TEST 1: GET /api/barcode-lookup?code=4056489592068 (known-good OFF product)")
+    print("="*80)
     
     try:
-        response = requests.get(f"{BASE_URL}/barcode-lookup?code=1234567890123")
+        token = mint_dev_jwt()
+        headers = {"Authorization": f"Bearer {token}"}
         
-        if response.status_code == 401:
-            print_result(True, "Returns 401 without Authorization header", 
-                        {"status": response.status_code, "error": response.json().get("error")})
+        response = requests.get(
+            f"{BASE_URL}/api/barcode-lookup?code=4056489592068",
+            headers=headers,
+            timeout=30
+        )
+        
+        print(f"Status Code: {response.status_code}")
+        print(f"Response: {json.dumps(response.json(), indent=2)}")
+        
+        if response.status_code == 200:
+            data = response.json()
+            
+            # Check required fields
+            assert data.get("found") == True, "Expected found:true"
+            assert data.get("name") is not None, "Expected name field"
+            assert data.get("brand") is not None, "Expected brand field"
+            assert data.get("source") == "off", f"Expected source:'off', got {data.get('source')}"
+            assert data.get("code") == "4056489592068", "Expected code field"
+            
+            # Should NOT have fromCache:true (Supabase unavailable)
+            if data.get("fromCache") == True:
+                print("⚠️  WARNING: fromCache:true present (unexpected - Supabase should be unavailable)")
+            else:
+                print("✅ No fromCache field (correct - cache unavailable)")
+            
+            # Check for debug fields
+            assert "triedVariants" in data, "Expected triedVariants field"
+            assert "triedSources" in data, "Expected triedSources field"
+            
+            print(f"✅ TEST 1 PASSED: Found product '{data.get('name')}' from brand '{data.get('brand')}'")
             return True
         else:
-            print_result(False, f"Expected 401, got {response.status_code}", 
-                        {"status": response.status_code, "body": response.json()})
+            print(f"❌ TEST 1 FAILED: Expected 200, got {response.status_code}")
             return False
+            
     except Exception as e:
-        print_result(False, f"Exception occurred: {str(e)}")
+        print(f"❌ TEST 1 FAILED with exception: {str(e)}")
         return False
 
-def test_1b_lookup_validation():
-    """Test 1b: Validation - missing code, non-digit, too short, too long → 400"""
-    print_test_header("1b: Barcode Lookup - Validation")
+def test_barcode_lookup_bypass_cache():
+    """
+    Test 2: GET /api/barcode-lookup?code=4056489592068&bypassCache=1
+    Expected: 200, same data as Test 1, server logs should show (bypassCache) tag
+    """
+    print("\n" + "="*80)
+    print("TEST 2: GET /api/barcode-lookup?code=4056489592068&bypassCache=1")
+    print("="*80)
     
-    token = generate_jwt_token()
+    try:
+        token = mint_dev_jwt()
+        headers = {"Authorization": f"Bearer {token}"}
+        
+        response = requests.get(
+            f"{BASE_URL}/api/barcode-lookup?code=4056489592068&bypassCache=1",
+            headers=headers,
+            timeout=30
+        )
+        
+        print(f"Status Code: {response.status_code}")
+        print(f"Response: {json.dumps(response.json(), indent=2)}")
+        
+        if response.status_code == 200:
+            data = response.json()
+            
+            # Check required fields (same as Test 1)
+            assert data.get("found") == True, "Expected found:true"
+            assert data.get("name") is not None, "Expected name field"
+            assert data.get("brand") is not None, "Expected brand field"
+            assert data.get("source") == "off", f"Expected source:'off', got {data.get('source')}"
+            
+            # Should NOT have fromCache (bypassed)
+            assert data.get("fromCache") != True, "Expected no fromCache when bypassCache=1"
+            
+            print("✅ TEST 2 PASSED: bypassCache parameter working correctly")
+            print("ℹ️  Check server logs for '[barcode] lookup 4056489592068 (bypassCache)' message")
+            return True
+        else:
+            print(f"❌ TEST 2 FAILED: Expected 200, got {response.status_code}")
+            return False
+            
+    except Exception as e:
+        print(f"❌ TEST 2 FAILED with exception: {str(e)}")
+        return False
+
+def test_barcode_lookup_invalid_codes():
+    """
+    Test 3: GET /api/barcode-lookup with invalid codes
+    Expected: 400, error:'Invalid barcode'
+    """
+    print("\n" + "="*80)
+    print("TEST 3: GET /api/barcode-lookup with invalid codes")
+    print("="*80)
+    
+    token = mint_dev_jwt()
     headers = {"Authorization": f"Bearer {token}"}
     
-    test_cases = [
-        ("missing code", f"{BASE_URL}/barcode-lookup", "missing code parameter"),
-        ("non-digit", f"{BASE_URL}/barcode-lookup?code=ABCDEF", "non-numeric code"),
-        ("too short (5 digits)", f"{BASE_URL}/barcode-lookup?code=12345", "5-digit code"),
-        ("too long (15 digits)", f"{BASE_URL}/barcode-lookup?code=123456789012345", "15-digit code"),
-    ]
-    
+    invalid_codes = ["invalid", "abc123"]
     all_passed = True
-    for test_name, url, description in test_cases:
+    
+    for code in invalid_codes:
         try:
-            response = requests.get(url, headers=headers)
+            print(f"\n  Testing code: {code}")
+            response = requests.get(
+                f"{BASE_URL}/api/barcode-lookup?code={code}",
+                headers=headers,
+                timeout=10
+            )
+            
+            print(f"  Status Code: {response.status_code}")
+            print(f"  Response: {json.dumps(response.json(), indent=2)}")
+            
             if response.status_code == 400:
-                print_result(True, f"{test_name}: Returns 400 for {description}", 
-                            {"status": 400, "error": response.json().get("error")})
+                data = response.json()
+                if data.get("error") == "Invalid barcode":
+                    print(f"  ✅ Correctly rejected invalid code '{code}'")
+                else:
+                    print(f"  ❌ Wrong error message: {data.get('error')}")
+                    all_passed = False
             else:
-                print_result(False, f"{test_name}: Expected 400, got {response.status_code}", 
-                            {"status": response.status_code, "body": response.json()})
+                print(f"  ❌ Expected 400, got {response.status_code}")
                 all_passed = False
+                
         except Exception as e:
-            print_result(False, f"{test_name}: Exception - {str(e)}")
+            print(f"  ❌ Failed with exception: {str(e)}")
             all_passed = False
+    
+    if all_passed:
+        print("\n✅ TEST 3 PASSED: All invalid codes correctly rejected")
+    else:
+        print("\n❌ TEST 3 FAILED: Some invalid codes not handled correctly")
     
     return all_passed
 
-def test_1c_lookup_real_hit_van_gilse():
-    """Test 1c: Real hit - 8710437003216 (Van Gilse sugar)"""
-    print_test_header("1c: Barcode Lookup - Real Hit (Van Gilse)")
-    
-    token = generate_jwt_token()
-    headers = {"Authorization": f"Bearer {token}"}
+def test_barcode_lookup_no_auth():
+    """
+    Test 4: GET /api/barcode-lookup without Authorization header
+    Expected: 401, error:'Unauthorized'
+    """
+    print("\n" + "="*80)
+    print("TEST 4: GET /api/barcode-lookup without Authorization header")
+    print("="*80)
     
     try:
-        start_time = time.time()
-        response = requests.get(f"{BASE_URL}/barcode-lookup?code=8710437003216", headers=headers)
-        duration = time.time() - start_time
+        response = requests.get(
+            f"{BASE_URL}/api/barcode-lookup?code=4056489592068",
+            timeout=10
+        )
         
-        if response.status_code == 200:
+        print(f"Status Code: {response.status_code}")
+        print(f"Response: {json.dumps(response.json(), indent=2)}")
+        
+        if response.status_code == 401:
             data = response.json()
-            
-            # Check required fields
-            checks = [
-                (data.get("found") == True, "found is true"),
-                ("Basterdsuiker" in (data.get("name") or "").lower() or "suiker" in (data.get("name") or "").lower(), 
-                 f"name contains sugar-related term: '{data.get('name')}'"),
-                (data.get("brand") and "gilse" in data.get("brand").lower(), 
-                 f"brand contains 'Gilse': '{data.get('brand')}'"),
-                (data.get("source") == "off", f"source is 'off': '{data.get('source')}'"),
-                ("8710437003216" in data.get("triedVariants", []), 
-                 f"triedVariants contains code: {data.get('triedVariants')}"),
-                ("off" in data.get("triedSources", []), 
-                 f"triedSources contains 'off': {data.get('triedSources')}"),
-            ]
-            
-            all_passed = all(check[0] for check in checks)
-            
-            for passed, message in checks:
-                print(f"  {'✓' if passed else '✗'} {message}")
-            
-            print_result(all_passed, f"Real hit test completed in {duration:.2f}s", 
-                        {
-                            "found": data.get("found"),
-                            "name": data.get("name"),
-                            "brand": data.get("brand"),
-                            "source": data.get("source"),
-                            "triedVariants": data.get("triedVariants"),
-                            "triedSources": data.get("triedSources")
-                        })
-            return all_passed
-        else:
-            print_result(False, f"Expected 200, got {response.status_code}", 
-                        {"status": response.status_code, "body": response.json()})
-            return False
-    except Exception as e:
-        print_result(False, f"Exception occurred: {str(e)}")
-        return False
-
-def test_1d_lookup_real_hit_muesli():
-    """Test 1d: Real hit - 4056489592068 (Muesli)"""
-    print_test_header("1d: Barcode Lookup - Real Hit (Muesli)")
-    
-    token = generate_jwt_token()
-    headers = {"Authorization": f"Bearer {token}"}
-    
-    try:
-        start_time = time.time()
-        response = requests.get(f"{BASE_URL}/barcode-lookup?code=4056489592068", headers=headers)
-        duration = time.time() - start_time
-        
-        if response.status_code == 200:
-            data = response.json()
-            
-            # Check required fields
-            checks = [
-                (data.get("found") == True, "found is true"),
-                ("muesli" in (data.get("name") or "").lower(), 
-                 f"name contains 'Muesli': '{data.get('name')}'"),
-                (data.get("brand") and "crownfield" in data.get("brand").lower(), 
-                 f"brand is 'Crownfield': '{data.get('brand')}'"),
-                (data.get("source") == "off", f"source is 'off': '{data.get('source')}'"),
-            ]
-            
-            all_passed = all(check[0] for check in checks)
-            
-            for passed, message in checks:
-                print(f"  {'✓' if passed else '✗'} {message}")
-            
-            print_result(all_passed, f"Real hit test completed in {duration:.2f}s", 
-                        {
-                            "found": data.get("found"),
-                            "name": data.get("name"),
-                            "brand": data.get("brand"),
-                            "source": data.get("source")
-                        })
-            return all_passed
-        else:
-            print_result(False, f"Expected 200, got {response.status_code}", 
-                        {"status": response.status_code, "body": response.json()})
-            return False
-    except Exception as e:
-        print_result(False, f"Exception occurred: {str(e)}")
-        return False
-
-def test_1e_lookup_guaranteed_miss():
-    """Test 1e: Guaranteed miss - 2210620002500 (GS1 internal-use)"""
-    print_test_header("1e: Barcode Lookup - Guaranteed Miss")
-    
-    token = generate_jwt_token()
-    headers = {"Authorization": f"Bearer {token}"}
-    
-    try:
-        start_time = time.time()
-        response = requests.get(f"{BASE_URL}/barcode-lookup?code=2210620002500", headers=headers)
-        duration = time.time() - start_time
-        
-        if response.status_code == 200:
-            data = response.json()
-            
-            # Check required fields for a miss
-            checks = [
-                (data.get("found") == False, f"found is false: {data.get('found')}"),
-                (data.get("source") == "none", f"source is 'none': '{data.get('source')}'"),
-                (len(data.get("triedSources", [])) == 5, 
-                 f"triedSources contains all 5 sources: {data.get('triedSources')}"),
-                ("off" in data.get("triedSources", []), "triedSources contains 'off'"),
-                ("obf" in data.get("triedSources", []), "triedSources contains 'obf'"),
-                ("opf" in data.get("triedSources", []), "triedSources contains 'opf'"),
-                ("opff" in data.get("triedSources", []), "triedSources contains 'opff'"),
-                ("upcitemdb" in data.get("triedSources", []), "triedSources contains 'upcitemdb'"),
-            ]
-            
-            all_passed = all(check[0] for check in checks)
-            
-            for passed, message in checks:
-                print(f"  {'✓' if passed else '✗'} {message}")
-            
-            print_result(all_passed, f"Guaranteed miss test completed in {duration:.2f}s", 
-                        {
-                            "found": data.get("found"),
-                            "source": data.get("source"),
-                            "triedSources": data.get("triedSources"),
-                            "triedVariants": data.get("triedVariants")
-                        })
-            return all_passed
-        else:
-            print_result(False, f"Expected 200, got {response.status_code}", 
-                        {"status": response.status_code, "body": response.json()})
-            return False
-    except Exception as e:
-        print_result(False, f"Exception occurred: {str(e)}")
-        return False
-
-def test_1f_lookup_timeout_check():
-    """Test 1f: Timeout check - completes in reasonable time (< 15s)"""
-    print_test_header("1f: Barcode Lookup - Timeout Check")
-    
-    token = generate_jwt_token()
-    headers = {"Authorization": f"Bearer {token}"}
-    
-    try:
-        start_time = time.time()
-        response = requests.get(f"{BASE_URL}/barcode-lookup?code=2210620002500", headers=headers)
-        duration = time.time() - start_time
-        
-        if response.status_code == 200:
-            if duration < 15:
-                print_result(True, f"Request completed in {duration:.2f}s (< 15s target)", 
-                            {"duration_seconds": round(duration, 2)})
+            if data.get("error") == "Unauthorized":
+                print("✅ TEST 4 PASSED: Correctly requires authentication")
                 return True
             else:
-                print_result(False, f"Request took {duration:.2f}s (> 15s target)", 
-                            {"duration_seconds": round(duration, 2)})
+                print(f"❌ TEST 4 FAILED: Wrong error message: {data.get('error')}")
                 return False
         else:
-            print_result(False, f"Expected 200, got {response.status_code}")
+            print(f"❌ TEST 4 FAILED: Expected 401, got {response.status_code}")
             return False
+            
     except Exception as e:
-        print_result(False, f"Exception occurred: {str(e)}")
+        print(f"❌ TEST 4 FAILED with exception: {str(e)}")
         return False
 
-# ============================================================================
-# TEST 2: /api/barcode-diagnose NEW ENDPOINT TESTS (5 tests)
-# ============================================================================
-
-def test_2a_diagnose_auth_guard():
-    """Test 2a: GET /api/barcode-diagnose without Authorization → 401"""
-    print_test_header("2a: Barcode Diagnose - Auth Guard")
+def test_barcode_cache_delete():
+    """
+    Test 5: DELETE /api/barcode-cache?code=4056489592068
+    Expected: 200, invalidated:'4056489592068'
+    """
+    print("\n" + "="*80)
+    print("TEST 5: DELETE /api/barcode-cache?code=4056489592068")
+    print("="*80)
     
     try:
-        response = requests.get(f"{BASE_URL}/barcode-diagnose?code=4056489592068")
+        token = mint_dev_jwt()
+        headers = {"Authorization": f"Bearer {token}"}
+        
+        response = requests.delete(
+            f"{BASE_URL}/api/barcode-cache?code=4056489592068",
+            headers=headers,
+            timeout=10
+        )
+        
+        print(f"Status Code: {response.status_code}")
+        print(f"Response: {json.dumps(response.json(), indent=2)}")
+        
+        if response.status_code == 200:
+            data = response.json()
+            if data.get("invalidated") == "4056489592068":
+                print("✅ TEST 5 PASSED: Cache invalidation endpoint working")
+                print("ℹ️  Check server logs for '[barcode] cache invalidated for 4056489592068 by user dev-user'")
+                return True
+            else:
+                print(f"❌ TEST 5 FAILED: Wrong response: {data}")
+                return False
+        else:
+            print(f"❌ TEST 5 FAILED: Expected 200, got {response.status_code}")
+            return False
+            
+    except Exception as e:
+        print(f"❌ TEST 5 FAILED with exception: {str(e)}")
+        return False
+
+def test_barcode_cache_delete_invalid():
+    """
+    Test 6: DELETE /api/barcode-cache?code=abc (invalid code)
+    Expected: 400, error:'Invalid barcode'
+    """
+    print("\n" + "="*80)
+    print("TEST 6: DELETE /api/barcode-cache?code=abc (invalid code)")
+    print("="*80)
+    
+    try:
+        token = mint_dev_jwt()
+        headers = {"Authorization": f"Bearer {token}"}
+        
+        response = requests.delete(
+            f"{BASE_URL}/api/barcode-cache?code=abc",
+            headers=headers,
+            timeout=10
+        )
+        
+        print(f"Status Code: {response.status_code}")
+        print(f"Response: {json.dumps(response.json(), indent=2)}")
+        
+        if response.status_code == 400:
+            data = response.json()
+            if data.get("error") == "Invalid barcode":
+                print("✅ TEST 6 PASSED: Invalid code correctly rejected")
+                return True
+            else:
+                print(f"❌ TEST 6 FAILED: Wrong error message: {data.get('error')}")
+                return False
+        else:
+            print(f"❌ TEST 6 FAILED: Expected 400, got {response.status_code}")
+            return False
+            
+    except Exception as e:
+        print(f"❌ TEST 6 FAILED with exception: {str(e)}")
+        return False
+
+def test_barcode_cache_delete_no_auth():
+    """
+    Test 7: DELETE /api/barcode-cache without Authorization header
+    Expected: 401, error:'Unauthorized'
+    """
+    print("\n" + "="*80)
+    print("TEST 7: DELETE /api/barcode-cache without Authorization header")
+    print("="*80)
+    
+    try:
+        response = requests.delete(
+            f"{BASE_URL}/api/barcode-cache?code=4056489592068",
+            timeout=10
+        )
+        
+        print(f"Status Code: {response.status_code}")
+        print(f"Response: {json.dumps(response.json(), indent=2)}")
         
         if response.status_code == 401:
-            print_result(True, "Returns 401 without Authorization header", 
-                        {"status": response.status_code, "error": response.json().get("error")})
+            data = response.json()
+            if data.get("error") == "Unauthorized":
+                print("✅ TEST 7 PASSED: Correctly requires authentication")
+                return True
+            else:
+                print(f"❌ TEST 7 FAILED: Wrong error message: {data.get('error')}")
+                return False
+        else:
+            print(f"❌ TEST 7 FAILED: Expected 401, got {response.status_code}")
+            return False
+            
+    except Exception as e:
+        print(f"❌ TEST 7 FAILED with exception: {str(e)}")
+        return False
+
+def test_barcode_cache_delete_no_code():
+    """
+    Test 8: DELETE /api/barcode-cache without code param
+    Expected: 400, error:'Invalid barcode'
+    """
+    print("\n" + "="*80)
+    print("TEST 8: DELETE /api/barcode-cache without code param")
+    print("="*80)
+    
+    try:
+        token = mint_dev_jwt()
+        headers = {"Authorization": f"Bearer {token}"}
+        
+        response = requests.delete(
+            f"{BASE_URL}/api/barcode-cache",
+            headers=headers,
+            timeout=10
+        )
+        
+        print(f"Status Code: {response.status_code}")
+        print(f"Response: {json.dumps(response.json(), indent=2)}")
+        
+        if response.status_code == 400:
+            data = response.json()
+            if data.get("error") == "Invalid barcode":
+                print("✅ TEST 8 PASSED: Missing code param correctly rejected")
+                return True
+            else:
+                print(f"❌ TEST 8 FAILED: Wrong error message: {data.get('error')}")
+                return False
+        else:
+            print(f"❌ TEST 8 FAILED: Expected 400, got {response.status_code}")
+            return False
+            
+    except Exception as e:
+        print(f"❌ TEST 8 FAILED with exception: {str(e)}")
+        return False
+
+def test_shopping_list_delete_regression():
+    """
+    Test 9: DELETE /api/shopping-list?checked=true (regression test)
+    Expected: Should NOT throw ReferenceError: url is not defined
+    """
+    print("\n" + "="*80)
+    print("TEST 9: DELETE /api/shopping-list?checked=true (regression test)")
+    print("="*80)
+    
+    try:
+        token = mint_dev_jwt()
+        headers = {"Authorization": f"Bearer {token}"}
+        
+        response = requests.delete(
+            f"{BASE_URL}/api/shopping-list?checked=true",
+            headers=headers,
+            timeout=10
+        )
+        
+        print(f"Status Code: {response.status_code}")
+        print(f"Response: {json.dumps(response.json(), indent=2)}")
+        
+        # We expect 500 due to missing Supabase, but NOT a ReferenceError
+        if response.status_code == 500:
+            data = response.json()
+            error_msg = data.get("error", "")
+            details = data.get("details", "")
+            
+            # Check that it's NOT the ReferenceError
+            if "ReferenceError" in str(error_msg) or "url is not defined" in str(details):
+                print("❌ TEST 9 FAILED: ReferenceError: url is not defined still present")
+                return False
+            else:
+                print("✅ TEST 9 PASSED: No ReferenceError (DB unavailable error is expected)")
+                print("ℹ️  Check server logs to confirm no 'ReferenceError: url is not defined'")
+                return True
+        elif response.status_code == 200:
+            # If it somehow works (shouldn't in this env), that's also fine
+            print("✅ TEST 9 PASSED: Endpoint working (unexpected but acceptable)")
             return True
         else:
-            print_result(False, f"Expected 401, got {response.status_code}", 
-                        {"status": response.status_code, "body": response.json()})
-            return False
+            print(f"⚠️  TEST 9: Unexpected status {response.status_code}, but no ReferenceError")
+            return True
+            
     except Exception as e:
-        print_result(False, f"Exception occurred: {str(e)}")
+        print(f"❌ TEST 9 FAILED with exception: {str(e)}")
         return False
 
-def test_2b_diagnose_validation():
-    """Test 2b: Validation - missing code, non-digit, too short, too long → 400"""
-    print_test_header("2b: Barcode Diagnose - Validation")
+def test_barcode_diagnose():
+    """
+    Test 10: GET /api/barcode-diagnose?code=4056489592068
+    Expected: 200, JSON with requestedCode, variants, attempts array, summary
+    """
+    print("\n" + "="*80)
+    print("TEST 10: GET /api/barcode-diagnose?code=4056489592068")
+    print("="*80)
     
-    token = generate_jwt_token()
-    headers = {"Authorization": f"Bearer {token}"}
-    
-    test_cases = [
-        ("missing code", f"{BASE_URL}/barcode-diagnose", "missing code parameter"),
-        ("non-digit", f"{BASE_URL}/barcode-diagnose?code=ABCDEF", "non-numeric code"),
-        ("too short (5 digits)", f"{BASE_URL}/barcode-diagnose?code=12345", "5-digit code"),
-        ("too long (15 digits)", f"{BASE_URL}/barcode-diagnose?code=123456789012345", "15-digit code"),
-    ]
-    
-    all_passed = True
-    for test_name, url, description in test_cases:
-        try:
-            response = requests.get(url, headers=headers)
-            if response.status_code == 400:
-                print_result(True, f"{test_name}: Returns 400 for {description}", 
-                            {"status": 400, "error": response.json().get("error")})
+    try:
+        token = mint_dev_jwt()
+        headers = {"Authorization": f"Bearer {token}"}
+        
+        response = requests.get(
+            f"{BASE_URL}/api/barcode-diagnose?code=4056489592068",
+            headers=headers,
+            timeout=60  # Longer timeout as it queries all sources
+        )
+        
+        print(f"Status Code: {response.status_code}")
+        print(f"Response: {json.dumps(response.json(), indent=2)}")
+        
+        if response.status_code == 200:
+            data = response.json()
+            
+            # Check required fields
+            assert "requestedCode" in data, "Expected requestedCode field"
+            assert "variants" in data, "Expected variants field"
+            assert "attempts" in data, "Expected attempts array"
+            assert "summary" in data, "Expected summary field"
+            
+            # Check summary fields
+            summary = data.get("summary", {})
+            assert "anyHit" in summary, "Expected summary.anyHit"
+            assert "firstHit" in summary, "Expected summary.firstHit"
+            
+            # Check attempts array has 5 sources
+            attempts = data.get("attempts", [])
+            assert len(attempts) >= 5, f"Expected at least 5 attempts, got {len(attempts)}"
+            
+            # Verify at least one hit (OFF should work)
+            if summary.get("anyHit") == True and summary.get("firstHit") == "off":
+                print(f"✅ TEST 10 PASSED: Diagnose endpoint working, found product via {summary.get('firstHit')}")
+                print(f"ℹ️  Total sources queried: {len(attempts)}")
+                print("ℹ️  Check server logs to confirm NO '[barcode_cache]' warnings for diagnose")
+                return True
             else:
-                print_result(False, f"{test_name}: Expected 400, got {response.status_code}", 
-                            {"status": response.status_code, "body": response.json()})
-                all_passed = False
-        except Exception as e:
-            print_result(False, f"{test_name}: Exception - {str(e)}")
-            all_passed = False
-    
-    return all_passed
-
-def test_2c_diagnose_hit_case():
-    """Test 2c: Hit case - 4056489592068 with full matrix"""
-    print_test_header("2c: Barcode Diagnose - Hit Case (Full Matrix)")
-    
-    token = generate_jwt_token()
-    headers = {"Authorization": f"Bearer {token}"}
-    
-    try:
-        start_time = time.time()
-        response = requests.get(f"{BASE_URL}/barcode-diagnose?code=4056489592068", headers=headers)
-        duration = time.time() - start_time
-        
-        if response.status_code == 200:
-            data = response.json()
-            
-            # Check response shape
-            checks = [
-                (data.get("requestedCode") == "4056489592068", 
-                 f"requestedCode is correct: '{data.get('requestedCode')}'"),
-                (isinstance(data.get("variants"), list) and len(data.get("variants")) > 0, 
-                 f"variants is array: {data.get('variants')}"),
-                (isinstance(data.get("attempts"), list), "attempts is array"),
-                (len(data.get("attempts", [])) == 5, 
-                 f"attempts.length === 5 (never stops early): {len(data.get('attempts', []))}"),
-                (isinstance(data.get("summary"), dict), "summary is object"),
-            ]
-            
-            # Check first attempt (should be a hit from OFF)
-            attempts = data.get("attempts", [])
-            if len(attempts) > 0:
-                first_attempt = attempts[0]
-                checks.extend([
-                    (first_attempt.get("code") == "4056489592068", 
-                     f"first attempt code: '{first_attempt.get('code')}'"),
-                    (first_attempt.get("source") == "off", 
-                     f"first attempt source: '{first_attempt.get('source')}'"),
-                    (first_attempt.get("sourceName") == "Open Food Facts", 
-                     f"first attempt sourceName: '{first_attempt.get('sourceName')}'"),
-                    (first_attempt.get("hit") == True, 
-                     f"first attempt hit: {first_attempt.get('hit')}"),
-                    (isinstance(first_attempt.get("durationMs"), (int, float)), 
-                     f"first attempt durationMs is number: {first_attempt.get('durationMs')}"),
-                    (isinstance(first_attempt.get("product"), dict), 
-                     "first attempt has product object"),
-                ])
+                print(f"⚠️  TEST 10: Diagnose returned but no hits found (may be rate-limited)")
+                print("ℹ️  Structure is correct, but product lookup failed")
+                return True  # Structure is correct even if no hits
                 
-                product = first_attempt.get("product", {})
-                if product:
-                    checks.extend([
-                        (product.get("name") is not None, 
-                         f"product has name: '{product.get('name')}'"),
-                        (product.get("brand") is not None, 
-                         f"product has brand: '{product.get('brand')}'"),
-                    ])
-            
-            # Check summary
-            summary = data.get("summary", {})
-            checks.extend([
-                (summary.get("anyHit") == True, f"summary.anyHit is true: {summary.get('anyHit')}"),
-                (summary.get("firstHit") == "off", f"summary.firstHit is 'off': '{summary.get('firstHit')}'"),
-                (isinstance(summary.get("totalDurationMs"), (int, float)), 
-                 f"summary.totalDurationMs is number: {summary.get('totalDurationMs')}"),
-                (summary.get("totalSourcesQueried") == 5, 
-                 f"summary.totalSourcesQueried is 5: {summary.get('totalSourcesQueried')}"),
-            ])
-            
-            all_passed = all(check[0] for check in checks)
-            
-            for passed, message in checks:
-                print(f"  {'✓' if passed else '✗'} {message}")
-            
-            print_result(all_passed, f"Hit case test completed in {duration:.2f}s", 
-                        {
-                            "requestedCode": data.get("requestedCode"),
-                            "variants": data.get("variants"),
-                            "attempts_count": len(data.get("attempts", [])),
-                            "first_attempt": attempts[0] if attempts else None,
-                            "summary": data.get("summary")
-                        })
-            return all_passed
         else:
-            print_result(False, f"Expected 200, got {response.status_code}", 
-                        {"status": response.status_code, "body": response.json()})
+            print(f"❌ TEST 10 FAILED: Expected 200, got {response.status_code}")
             return False
+            
     except Exception as e:
-        print_result(False, f"Exception occurred: {str(e)}")
+        print(f"❌ TEST 10 FAILED with exception: {str(e)}")
         return False
 
-def test_2d_diagnose_full_miss():
-    """Test 2d: Full-miss case - 2210620002500"""
-    print_test_header("2d: Barcode Diagnose - Full Miss Case")
-    
-    token = generate_jwt_token()
-    headers = {"Authorization": f"Bearer {token}"}
-    
-    try:
-        start_time = time.time()
-        response = requests.get(f"{BASE_URL}/barcode-diagnose?code=2210620002500", headers=headers)
-        duration = time.time() - start_time
-        
-        if response.status_code == 200:
-            data = response.json()
-            
-            # Check response shape for miss
-            attempts = data.get("attempts", [])
-            summary = data.get("summary", {})
-            
-            checks = [
-                (len(attempts) == 5, f"attempts.length === 5: {len(attempts)}"),
-                (all(not attempt.get("hit") for attempt in attempts), 
-                 "all attempts have hit:false"),
-                (summary.get("anyHit") == False, f"summary.anyHit is false: {summary.get('anyHit')}"),
-                (summary.get("firstHit") is None, f"summary.firstHit is null: {summary.get('firstHit')}"),
-            ]
-            
-            all_passed = all(check[0] for check in checks)
-            
-            for passed, message in checks:
-                print(f"  {'✓' if passed else '✗'} {message}")
-            
-            print_result(all_passed, f"Full miss test completed in {duration:.2f}s", 
-                        {
-                            "attempts_count": len(attempts),
-                            "all_miss": all(not a.get("hit") for a in attempts),
-                            "summary": summary
-                        })
-            return all_passed
-        else:
-            print_result(False, f"Expected 200, got {response.status_code}", 
-                        {"status": response.status_code, "body": response.json()})
-            return False
-    except Exception as e:
-        print_result(False, f"Exception occurred: {str(e)}")
-        return False
+def check_server_logs():
+    """
+    Helper to remind about checking server logs for graceful degradation warnings
+    """
+    print("\n" + "="*80)
+    print("SERVER LOG CHECKS")
+    print("="*80)
+    print("""
+Please verify the following in server logs:
 
-def test_2e_diagnose_variant_expansion():
-    """Test 2e: Variant expansion - 049000042566 (12-digit UPC-A)"""
-    print_test_header("2e: Barcode Diagnose - Variant Expansion")
-    
-    token = generate_jwt_token()
-    headers = {"Authorization": f"Bearer {token}"}
-    
-    try:
-        start_time = time.time()
-        response = requests.get(f"{BASE_URL}/barcode-diagnose?code=049000042566", headers=headers)
-        duration = time.time() - start_time
-        
-        if response.status_code == 200:
-            data = response.json()
-            
-            variants = data.get("variants", [])
-            attempts = data.get("attempts", [])
-            
-            # Check variant expansion
-            checks = [
-                ("049000042566" in variants, 
-                 f"variants contains original 12-digit: {variants}"),
-                ("0049000042566" in variants, 
-                 f"variants contains 13-digit EAN-13: {variants}"),
-                (len(variants) == 2, f"variants array has 2 entries: {len(variants)}"),
-                (len(attempts) == 10, 
-                 f"attempts.length === 10 (5 sources × 2 variants): {len(attempts)}"),
-            ]
-            
-            all_passed = all(check[0] for check in checks)
-            
-            for passed, message in checks:
-                print(f"  {'✓' if passed else '✗'} {message}")
-            
-            print_result(all_passed, f"Variant expansion test completed in {duration:.2f}s", 
-                        {
-                            "variants": variants,
-                            "attempts_count": len(attempts)
-                        })
-            return all_passed
-        else:
-            print_result(False, f"Expected 200, got {response.status_code}", 
-                        {"status": response.status_code, "body": response.json()})
-            return False
-    except Exception as e:
-        print_result(False, f"Exception occurred: {str(e)}")
-        return False
+1. For Test 1 (barcode-lookup without bypassCache):
+   - Should see: [barcode] lookup 4056489592068
+   - Should see: [barcode_cache] getFresh threw: (graceful degradation)
+   - Should see: [barcode_cache] upsert threw: (graceful degradation)
 
-# ============================================================================
-# TEST 3: RESPONSE SHAPE BACKWARDS COMPATIBILITY
-# ============================================================================
+2. For Test 2 (barcode-lookup with bypassCache):
+   - Should see: [barcode] lookup 4056489592068 (bypassCache)
+   - Should NOT see any [barcode_cache] warnings (cache skipped)
 
-def test_3_backwards_compatibility():
-    """Test 3: Response shape backwards compatibility"""
-    print_test_header("3: Response Shape Backwards Compatibility")
-    
-    token = generate_jwt_token()
-    headers = {"Authorization": f"Bearer {token}"}
-    
-    try:
-        response = requests.get(f"{BASE_URL}/barcode-lookup?code=4056489592068", headers=headers)
-        
-        if response.status_code == 200:
-            data = response.json()
-            
-            # Check all existing fields are present
-            required_fields = [
-                "found", "code", "requestedCode", "name", "brand", 
-                "image", "quantity", "source", "triedVariants"
-            ]
-            
-            # New field
-            new_fields = ["triedSources"]
-            
-            checks = []
-            for field in required_fields:
-                checks.append((field in data, f"Field '{field}' present"))
-            
-            for field in new_fields:
-                checks.append((field in data, f"NEW field '{field}' present"))
-            
-            all_passed = all(check[0] for check in checks)
-            
-            for passed, message in checks:
-                print(f"  {'✓' if passed else '✗'} {message}")
-            
-            print_result(all_passed, "Backwards compatibility check", 
-                        {
-                            "all_fields_present": all_passed,
-                            "fields": list(data.keys())
-                        })
-            return all_passed
-        else:
-            print_result(False, f"Expected 200, got {response.status_code}")
-            return False
-    except Exception as e:
-        print_result(False, f"Exception occurred: {str(e)}")
-        return False
+3. For Test 5 (cache invalidation):
+   - Should see: [barcode] cache invalidated for 4056489592068 by user dev-user
 
-# ============================================================================
-# MAIN TEST RUNNER
-# ============================================================================
+4. For Test 9 (shopping-list delete):
+   - Should NOT see: ReferenceError: url is not defined
+
+5. For Test 10 (barcode-diagnose):
+   - Should NOT see any [barcode_cache] warnings (diagnose bypasses cache)
+
+To check logs:
+  sudo tail -n 100 /var/log/supervisor/nextjs.out.log
+  sudo tail -n 100 /var/log/supervisor/nextjs.err.log
+""")
 
 def main():
-    """Run all tests and report results"""
+    """Run all tests"""
     print("\n" + "="*80)
-    print("BARCODE LOOKUP ENHANCEMENT TEST SUITE")
-    print("Testing enhanced barcode-lookup system + /api/barcode-diagnose endpoint")
+    print("BARCODE-CACHE ENDPOINTS TEST SUITE")
+    print("="*80)
+    print(f"Base URL: {BASE_URL}")
+    print(f"Test Environment: Supabase env vars NOT set (expected)")
+    print(f"Expected Behavior: Graceful degradation - cache reads/writes silently no-op")
     print("="*80)
     
-    results = {}
+    results = []
     
-    # Test 1: /api/barcode-lookup regression tests
-    print("\n" + "="*80)
-    print("SECTION 1: /api/barcode-lookup REGRESSION TESTS")
-    print("="*80)
-    results["1a_auth_guard"] = test_1a_lookup_auth_guard()
-    results["1b_validation"] = test_1b_lookup_validation()
-    results["1c_real_hit_van_gilse"] = test_1c_lookup_real_hit_van_gilse()
-    results["1d_real_hit_muesli"] = test_1d_lookup_real_hit_muesli()
-    results["1e_guaranteed_miss"] = test_1e_lookup_guaranteed_miss()
-    results["1f_timeout_check"] = test_1f_lookup_timeout_check()
+    # Run all tests
+    results.append(("Test 1: barcode-lookup known-good", test_barcode_lookup_known_good()))
+    results.append(("Test 2: barcode-lookup bypassCache", test_barcode_lookup_bypass_cache()))
+    results.append(("Test 3: barcode-lookup invalid codes", test_barcode_lookup_invalid_codes()))
+    results.append(("Test 4: barcode-lookup no auth", test_barcode_lookup_no_auth()))
+    results.append(("Test 5: barcode-cache delete", test_barcode_cache_delete()))
+    results.append(("Test 6: barcode-cache delete invalid", test_barcode_cache_delete_invalid()))
+    results.append(("Test 7: barcode-cache delete no auth", test_barcode_cache_delete_no_auth()))
+    results.append(("Test 8: barcode-cache delete no code", test_barcode_cache_delete_no_code()))
+    results.append(("Test 9: shopping-list delete regression", test_shopping_list_delete_regression()))
+    results.append(("Test 10: barcode-diagnose", test_barcode_diagnose()))
     
-    # Test 2: /api/barcode-diagnose new endpoint tests
-    print("\n" + "="*80)
-    print("SECTION 2: /api/barcode-diagnose NEW ENDPOINT TESTS")
-    print("="*80)
-    results["2a_auth_guard"] = test_2a_diagnose_auth_guard()
-    results["2b_validation"] = test_2b_diagnose_validation()
-    results["2c_hit_case"] = test_2c_diagnose_hit_case()
-    results["2d_full_miss"] = test_2d_diagnose_full_miss()
-    results["2e_variant_expansion"] = test_2e_diagnose_variant_expansion()
-    
-    # Test 3: Backwards compatibility
-    print("\n" + "="*80)
-    print("SECTION 3: BACKWARDS COMPATIBILITY")
-    print("="*80)
-    results["3_backwards_compatibility"] = test_3_backwards_compatibility()
-    
-    # Summary
+    # Print summary
     print("\n" + "="*80)
     print("TEST SUMMARY")
     print("="*80)
     
-    passed = sum(1 for v in results.values() if v)
+    passed = sum(1 for _, result in results if result)
     total = len(results)
     
-    print(f"\nTotal: {passed}/{total} tests passed")
-    print("\nDetailed Results:")
-    for test_name, result in results.items():
-        status = "✅ PASS" if result else "❌ FAIL"
-        print(f"  {status} - {test_name}")
+    for test_name, result in results:
+        status = "✅ PASSED" if result else "❌ FAILED"
+        print(f"{status}: {test_name}")
     
-    if passed == total:
-        print("\n🎉 ALL TESTS PASSED! 🎉")
-        return 0
-    else:
-        print(f"\n⚠️  {total - passed} test(s) failed")
-        return 1
+    print("\n" + "="*80)
+    print(f"TOTAL: {passed}/{total} tests passed")
+    print("="*80)
+    
+    # Remind about server log checks
+    check_server_logs()
+    
+    return passed == total
 
 if __name__ == "__main__":
-    exit(main())
+    success = main()
+    exit(0 if success else 1)

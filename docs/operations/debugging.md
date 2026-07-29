@@ -275,11 +275,29 @@ curl "https://world.openfoodfacts.org/api/v2/product/4056489592068.json" | jq .s
 
 ### Step 3 — Mitigating shared-IP rate limits
 
-Options in ascending order of effort:
+**Since Jul 2026 the server-side `barcode_cache` table (migration 003) already handles most of this automatically.** Every successful lookup — and every miss — is cached in Supabase with a TTL (30d for hits, 7d for misses). The next time anyone scans the same code, we return in ~30ms from Postgres without touching Open Food Facts.
 
-1. **Do nothing** — the "teach once, remember forever" flow (`lib/barcode-cache.js` + `UnknownBarcodeDialog`) already handles this gracefully. The cache is per-device, so a rate-limited scan that becomes a user-taught mapping never has to hit OFF again.
-2. **Add server-side caching** — parking successful OFF responses in Supabase (or KV) for 24h means one hit per barcode per day is enough. See "Future work" in `docs/features/kitchen.md`.
+What this means for debugging:
+
+- If a user reports "still says unknown" for a code that *should* be cached, the cache row is either stale, or was written when OFF was giving bad data. Nuke it and try again:
+  ```bash
+  curl -X DELETE -H "Authorization: Bearer <token>" \
+    "https://forkcast-six.vercel.app/api/barcode-cache?code=4056489592068"
+  ```
+  Or in the Supabase SQL Editor: `delete from public.barcode_cache where code = '4056489592068';`
+- To force a *fresh* upstream call for a single scan (bypassing both the read AND the write), append `?bypassCache=1` to the lookup URL:
+  ```bash
+  curl -H "Authorization: Bearer <token>" \
+    "https://forkcast-six.vercel.app/api/barcode-lookup?code=4056489592068&bypassCache=1"
+  ```
+- Cache hits are logged as `[barcode] cache hit <code> (<source>)` on the server. Cold lookups still log `[barcode] lookup <code>`. If prod logs show all `cache hit` lines and no `lookup` lines, the cache is doing its job.
+
+Remaining options if the cache alone isn't enough (e.g. many first-time scans of long-tail products from the same IP inside a minute):
+
+1. **Do nothing** — the "teach once, remember forever" client cache (`lib/barcode-cache.js` + `UnknownBarcodeDialog`) covers the residual gap. First scan misses → user teaches us → every subsequent scan on that device is instant.
+2. **Route OFF through a proxy with a dedicated static IP** (Fly.io / Railway box, ~$5/mo). Trades one shared-abuse IP for one clean IP.
 3. **Pay for API access** — the paid tiers of go-upc / UPCitemdb / Barcode Lookup use dedicated IPs and higher limits. The lookup module already leaves comments for where to slot the keys.
+4. **Register with Open Food Facts** — email `contact@openfoodfacts.org` explaining the app; they sometimes whitelist well-behaved User-Agents.
 
 ### Step 4 — Recognising GS1 internal-use codes
 

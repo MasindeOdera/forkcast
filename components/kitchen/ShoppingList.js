@@ -198,13 +198,13 @@ export default function ShoppingList() {
     //     network error is NOT the user's fault and should not push
     //     them into the "teach me" dialog. We branch on the canonical
     //     `error.code` from api-client so each failure mode gets a
-    //     specific, actionable message.
+    //     specific, actionable message. SESSION_EXPIRED is handled by
+    //     the global listener in app/page.js (auto-logout + toast) so
+    //     we return quietly here to avoid a double-toast.
     if (!lookup.ok) {
       const code = lookup.error?.code;
-      if (code === 'SESSION_EXPIRED') {
-        // Same auto-logout hook the rest of the app uses.
-        toast.error('Your session has expired. Please log out and log in again to scan.');
-      } else if (code === 'NETWORK_ERROR') {
+      if (code === 'SESSION_EXPIRED') return;
+      if (code === 'NETWORK_ERROR') {
         toast.error(lookup.error?.message || "You're offline — the barcode lookup needs a connection.");
       } else if (code === 'SERVER_ERROR') {
         toast.error('Product database is temporarily unreachable (server error). Try again in a moment.');

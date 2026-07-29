@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -87,7 +87,13 @@ export default function App() {
   // Called from any request that comes back with SESSION_EXPIRED. Clears
   // credentials, drops the user back to the login form, and shows ONE
   // clear toast (previous behaviour was to silently render an empty list).
+  //
+  // Debounced-once via `expiredRef` so a burst of parallel API calls all
+  // 401-ing on the same tick doesn't stack half a dozen toasts.
+  const expiredRef = useRef(false);
   const handleSessionExpired = useCallback(() => {
+    if (expiredRef.current) return;
+    expiredRef.current = true;
     localStorage.removeItem('forkcast_token');
     localStorage.removeItem('forkcast_user');
     setUser(null);
@@ -96,7 +102,23 @@ export default function App() {
     setMealsStatus('idle');
     setMealsError(null);
     toast.error('Your session has expired. Please log in again.');
+    // Reset the debounce guard once the user has had time to see the
+    // toast — otherwise re-login would leave expiredRef stuck true.
+    setTimeout(() => { expiredRef.current = false; }, 5000);
   }, []);
+
+  // ─── Global session-expired listener ────────────────────────────────
+  // lib/api-client.js dispatches 'forkcast:session-expired' on every 401.
+  // This gives us auto-logout coverage on API call sites that don't
+  // otherwise check `error.code === 'SESSION_EXPIRED'` themselves
+  // (Kitchen scanner, image uploads, etc.). Add-then-remove pattern
+  // avoids leaking a listener across HMR reloads in dev.
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const onExpired = () => handleSessionExpired();
+    window.addEventListener('forkcast:session-expired', onExpired);
+    return () => window.removeEventListener('forkcast:session-expired', onExpired);
+  }, [handleSessionExpired]);
 
   // ─── Meals loader ───────────────────────────────────────────────────
   // `isRefresh=true` means "we already have data on screen, just refetch
