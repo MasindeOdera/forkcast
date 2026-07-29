@@ -196,12 +196,26 @@ export default function ShoppingList() {
 
     // 2a) Distinguish an HTTP failure from a genuine miss. A 5xx or
     //     network error is NOT the user's fault and should not push
-    //     them into the "teach me" dialog.
+    //     them into the "teach me" dialog. We branch on the canonical
+    //     `error.code` from api-client so each failure mode gets a
+    //     specific, actionable message.
     if (!lookup.ok) {
-      toast.error(
-        lookup.error?.message
-          || 'Product lookup service is unavailable right now. Please try again in a moment.'
-      );
+      const code = lookup.error?.code;
+      if (code === 'SESSION_EXPIRED') {
+        // Same auto-logout hook the rest of the app uses.
+        toast.error('Your session has expired. Please log out and log in again to scan.');
+      } else if (code === 'NETWORK_ERROR') {
+        toast.error(lookup.error?.message || "You're offline — the barcode lookup needs a connection.");
+      } else if (code === 'SERVER_ERROR') {
+        toast.error('Product database is temporarily unreachable (server error). Try again in a moment.');
+      } else if (lookup.status === 429) {
+        toast.error('Open Food Facts rate-limited this server. Please wait a minute and try again.');
+      } else {
+        toast.error(
+          lookup.error?.message
+            || 'Product lookup service is unavailable right now. Please try again in a moment.'
+        );
+      }
       return;
     }
 

@@ -107,11 +107,24 @@ export default function Pantry() {
 
     // 2a) Distinguish an HTTP failure from a genuine miss — the "teach
     //     me" dialog is only for actual misses, not transient outages.
+    //     Branch on the canonical `error.code` from api-client so each
+    //     failure mode gets a specific, actionable message.
     if (!res.ok) {
-      toast.error(
-        res.error?.message
-          || 'Product lookup service is unavailable right now. Please try again in a moment.'
-      );
+      const code = res.error?.code;
+      if (code === 'SESSION_EXPIRED') {
+        toast.error('Your session has expired. Please log out and log in again to scan.');
+      } else if (code === 'NETWORK_ERROR') {
+        toast.error(res.error?.message || "You're offline — the barcode lookup needs a connection.");
+      } else if (code === 'SERVER_ERROR') {
+        toast.error('Product database is temporarily unreachable (server error). Try again in a moment.');
+      } else if (res.status === 429) {
+        toast.error('Open Food Facts rate-limited this server. Please wait a minute and try again.');
+      } else {
+        toast.error(
+          res.error?.message
+            || 'Product lookup service is unavailable right now. Please try again in a moment.'
+        );
+      }
       return;
     }
 
