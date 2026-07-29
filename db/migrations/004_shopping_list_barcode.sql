@@ -36,9 +36,27 @@ begin
         and    column_name  = 'barcode'
     ) then
         alter table public.shopping_list_items add column barcode text;
+    end if;
+end
+$$;
+
+-- Column comment. Kept OUTSIDE the DO block because COMMENT ON only
+-- accepts a plain string literal (no `||` concatenation inside the
+-- IS clause), and it's idempotent by nature — re-running just
+-- overwrites the existing comment. Wrap it in an IF-column-exists
+-- guard so this whole file remains safe to re-run even against a
+-- pristine DB that hasn't yet had the ALTER TABLE above execute.
+do $$
+begin
+    if exists (
+        select 1
+        from   information_schema.columns
+        where  table_schema = 'public'
+        and    table_name   = 'shopping_list_items'
+        and    column_name  = 'barcode'
+    ) then
         comment on column public.shopping_list_items.barcode is
-            'Nullable. Populated by scans via /api/shopping-list POST when the ' ||
-            'scanner resolves a product; NULL for manually-typed items.';
+            'Nullable. Populated by scans via /api/shopping-list POST when the scanner resolves a product; NULL for manually-typed items. See migration 004.';
     end if;
 end
 $$;
