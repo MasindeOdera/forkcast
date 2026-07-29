@@ -125,39 +125,66 @@ export default function ShoppingList() {
   };
 
   /**
-   * Given a resolved product name, try to tick off the closest
-   * matching item on the list. Simple case-insensitive substring
-   * match — good enough because users scan groceries they already
-   * added by name. If nothing matches, we ADD the item to the list
-   * so the scan is never wasted (fixes a class of "I scanned it and
-   * nothing happened" reports).
+   * Given a resolved product name (and optionally the barcode that
+   * resolved it), do the right thing on the shopping list:
+   *
+   *   1. If we ALREADY have that same barcode on the list, we're
+   *      re-scanning what the user just added — treat it as "I bought
+   *      this" and tick it off. Deterministic; unaffected by whether
+   *      OFF returns a slightly different `product_name` the second
+   *      time round.
+   *   2. Else if a fuzzy name match on an unchecked item wins, tick
+   *      that one off. This is the pre-scanner path used for
+   *      manually-typed items ("sugar" ticked off by scanning any
+   *      sugar product).
+   *   3. Otherwise, ADD the item to the list — so a scanned product is
+   *      never silently dropped.
+   *
+   * Root cause of the "8710437003216 doesn't display" report (Jul 2026):
+   * we used to jump straight to step 2 (fuzzy name), which meant the
+   * SECOND scan of a code (whose product name matched the row added by
+   * the FIRST scan) would tick it off and move it into "Already in the
+   * cart" — the user then thought the scan hadn't worked. Matching on
+   * barcode first makes the tick-off intentional AND enables the row
+   * to appear in the visible "To buy" list after the first scan.
    */
   const tickOffByProductName = async (productName, { code = null } = {}) => {
-    const target = items.find(
+    // Step 1 — deterministic barcode match. Only unchecked rows: a
+    // ticked-off row shouldn't magically un-tick when re-scanned.
+    const byBarcode = code
+      ? items.find((i) => !i.checked && i.barcode && i.barcode === code)
+      : null;
+    if (byBarcode) {
+      await toggle(byBarcode);
+      toast.success(`Ticked off ${byBarcode.name}`);
+      return;
+    }
+
+    // Step 2 — fuzzy name match for manually-typed items.
+    const byName = items.find(
       (i) => !i.checked && (
         i.name.toLowerCase().includes(productName.toLowerCase()) ||
         productName.toLowerCase().includes(i.name.toLowerCase())
       )
     );
-    if (!target) {
-      // Not on the list yet — add it so the user sees an obvious
-      // outcome. Better UX than the old silent "not on your list" toast
-      // which users often misread as "the scanner didn't recognize
-      // this item".
-      const res = await apiPost('/api/shopping-list', {
-        name: productName,
-        ...(code ? { barcode: code } : {}),
-      });
-      if (res.ok) {
-        setItems((cur) => [...cur, res.data]);
-        toast.success(`Added ${productName} to your list`);
-      } else {
-        toast.error(res.error?.message || `Recognised ${productName}, but could not add it to your list.`);
-      }
+    if (byName) {
+      await toggle(byName);
+      toast.success(`Ticked off ${byName.name}`);
       return;
     }
-    await toggle(target);
-    toast.success(`Ticked off ${target.name}`);
+
+    // Step 3 — new item. Persist name AND barcode so subsequent scans
+    // in step 1 can find it deterministically.
+    const res = await apiPost('/api/shopping-list', {
+      name: productName,
+      ...(code ? { barcode: code } : {}),
+    });
+    if (res.ok) {
+      setItems((cur) => [...cur, res.data]);
+      toast.success(`Added ${productName} to your list`);
+    } else {
+      toast.error(res.error?.message || `Recognised ${productName}, but could not add it to your list.`);
+    }
   };
 
   /**
@@ -371,9 +398,19 @@ function ShoppingRow({ item, onToggle, onRemove }) {
     <li className="flex items-center justify-between gap-3 py-2">
       <label className="flex items-center gap-3 min-w-0 flex-1 cursor-pointer">
         <Checkbox checked={item.checked} onCheckedChange={() => onToggle(item)} />
-        <span className={`truncate ${item.checked ? 'line-through text-muted-foreground' : ''}`}>
-          {item.name}
-        </span>
+        <div className="min-w-0 flex-1">
+          <p className={`truncate ${item.checked ? 'line-through text-muted-foreground' : ''}`}>
+            {item.name}
+          </p>
+          {/* Show the barcode for scan-added items so the user has a
+              visible confirmation that "the scan worked" — mirrors the
+              Pantry row layout ("no expiry set • 8710437003216"). */}
+          {item.barcode && (
+            <p className="text-xs text-muted-foreground truncate">
+              {item.barcode}
+            </p>
+          )}
+        </div>
       </label>
       <Button size="sm" variant="ghost" onClick={() => onRemove(item)} aria-label={`Remove ${item.name}`}>
         <Trash2 className="h-4 w-4 text-muted-foreground" />

@@ -140,6 +140,9 @@ create table if not exists public.shopping_list_items (
     id             uuid            primary key default gen_random_uuid(),
     user_id        uuid            not null references public.users(id) on delete cascade,
     name           text            not null,
+    -- Populated by scans via /api/shopping-list POST; NULL for
+    -- manually-typed items. See migration 004 for the ADD COLUMN.
+    barcode        text,
     checked        boolean         not null default false,
     source_meal_id uuid            references public.meals(id) on delete set null,
     added_at       timestamptz     not null default now()
@@ -147,6 +150,11 @@ create table if not exists public.shopping_list_items (
 
 create index if not exists shopping_list_items_user_id_idx on public.shopping_list_items (user_id);
 create index if not exists shopping_list_items_checked_idx on public.shopping_list_items (user_id, checked);
+-- Fast "do I already have this scanned code on my list?" lookup.
+-- Filtered to non-null so it only carries scan-added rows.
+create index if not exists shopping_list_items_user_barcode_idx
+    on public.shopping_list_items (user_id, barcode)
+    where barcode is not null;
 
 alter table public.pantry_items        enable row level security;
 alter table public.pantry_items        force  row level security;

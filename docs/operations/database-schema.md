@@ -54,13 +54,14 @@ Ingredients the user has at home. Added in `db/migrations/002_kitchen.sql`.
 
 ## `shopping_list_items`  <sub>(Kitchen feature)</sub>
 
-Items on the user's shopping list. Added in `db/migrations/002_kitchen.sql`.
+Items on the user's shopping list. Added in `db/migrations/002_kitchen.sql`; `barcode` column added in `db/migrations/004_shopping_list_barcode.sql` for feature parity with the pantry (scanned items now show their code on the row).
 
 | Column           | Type          | Notes                                        |
 |------------------|---------------|----------------------------------------------|
 | `id`             | `uuid` PK     |                                              |
 | `user_id`        | `uuid` FK     | → `users.id` (cascade delete)                |
 | `name`           | `text`        | Ingredient / product name                    |
+| `barcode`        | `text` null   | Populated for scan-added rows; NULL for manually-typed items. Filtered index on `(user_id, barcode)` powers the client's "already on list?" match. |
 | `checked`        | `boolean`     | `true` when the user has picked it up        |
 | `source_meal_id` | `uuid` FK null| → `meals.id` (set null on delete). Traces the item back to the recipe that produced it during a shopping list generation. |
 | `added_at`       | `timestamptz` |                                              |

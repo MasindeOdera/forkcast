@@ -83,8 +83,14 @@ create table public.pantry_items (
 );
 
 create table public.shopping_list_items (
-    id, user_id, name, checked, source_meal_id, added_at
+    id, user_id, name, barcode, checked, source_meal_id, added_at
 );
+
+-- barcode column added in migration 004. Nullable — manually-typed
+-- items have no code, only scan-added items do. There's a filtered
+-- index on (user_id, barcode) WHERE barcode IS NOT NULL for the
+-- client's "do I already have this scanned code on my list?" lookup
+-- (see components/kitchen/ShoppingList.js tickOffByProductName).
 
 -- Cross-user cache backing the scanner. Not user-scoped: a barcode →
 -- product mapping is universal knowledge.

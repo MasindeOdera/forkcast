@@ -628,9 +628,15 @@ export async function POST(request, { params }) {
       if (!name) {
         return withCors(NextResponse.json({ error: 'Item name is required' }, { status: 400 }));
       }
+      // barcode is optional and only present when the item came from a
+      // scan. We accept 6-14 digit codes and coerce blanks to null so
+      // manually-typed items don't accidentally store empty strings.
+      const rawBarcode = typeof body.barcode === 'string' ? body.barcode.trim() : '';
+      const barcode = /^\d{6,14}$/.test(rawBarcode) ? rawBarcode : null;
       const { item } = await db.collection('shopping_list_items').insertOne({
         userId: user.userId,
         name,
+        barcode,
         sourceMealId: body.sourceMealId || null,
       });
       return withCors(NextResponse.json(item));
