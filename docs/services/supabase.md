@@ -120,6 +120,28 @@ We ship two things that together keep the project awake:
 
 See [workflow/github-actions.md](../workflow/github-actions.md) for a general primer on how GitHub Actions fits into this repo.
 
+#### ⚠️ Keeping a *second* project alive (e.g. `forkcast-backup`)
+
+The `/api/health` ping only keeps the **project your deployed app talks to** awake (the one behind `NEXT_PUBLIC_SUPABASE_URL`). If you have a **separate** Supabase project with no deployed app — like a `forkcast-backup` snapshot — nothing hits it, so it will still get paused after ~7 days.
+
+The keepalive workflow has a second job (`ping-backup`) that keeps such a project alive by querying its PostgREST endpoint **directly** with its service-role key (a REST query is a real DB request and resets the inactivity timer). It's **optional** — the job skips cleanly if the secrets below aren't set.
+
+To enable it, add these repository secrets (**Settings → Secrets and variables → Actions**):
+
+| Secret | Value |
+|--------|-------|
+| `BACKUP_SUPABASE_URL` | `https://<backup-project-ref>.supabase.co` (from **Project Settings → API**) |
+| `BACKUP_SUPABASE_SERVICE_ROLE_KEY` | The backup project's **service role** key (server-side, bypasses RLS) |
+| `BACKUP_KEEPALIVE_TABLE` | *(optional)* table to query; defaults to `users`. If the backup mirrors Forkcast, `users` works. |
+
+Notes:
+- Use the **service role** key so RLS default-deny policies don't return zero rows / 401 — the request still needs to succeed to count as activity.
+- If the table name is wrong the job falls back to a PostgREST root introspection call, which still touches the DB and keeps the project awake.
+- Trigger manually to verify: **Actions → "Supabase Keepalive" → Run workflow**. The `ping-backup` job should finish green in a few seconds and log `Backup project is awake. Inactivity timer reset.`
+- If `ping-backup` fails with a non-200 code, the backup project may already be paused — click **Restore project** in its dashboard once, then re-run the workflow. From then on the cron keeps it awake.
+
+> ⚠️ **Never commit the service-role key.** It lives only as a GitHub Actions secret; the workflow reads it from `secrets.*` at runtime.
+
 ### Option 3 — Upgrade
 If you'd rather not depend on a cron, upgrading to Supabase Pro removes the auto-pause behaviour entirely.
 

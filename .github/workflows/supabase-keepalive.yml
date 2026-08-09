@@ -1,14 +1,27 @@
-# Keeps the Supabase project from auto-pausing on the free tier.
+# Keeps Supabase project(s) from auto-pausing on the free tier.
 #
 # Supabase pauses a free-tier project after ~7 days of inactivity. Any
-# successful query resets that timer. This workflow hits GET /api/health
-# (which runs a trivial query against the users table) every 3 days, well
-# under the pause threshold.
+# successful query resets that timer. This workflow runs every 3 days
+# (well under the pause threshold) and keeps two projects awake:
+#
+#   1. The PRIMARY project — pinged indirectly via the deployed app's
+#      GET /api/health endpoint (which runs a trivial query on `users`).
+#
+#   2. The BACKUP project (`forkcast-backup`) — this one has no deployed
+#      app, so we hit its Supabase PostgREST endpoint DIRECTLY with its
+#      service-role key. A REST query is a real DB request and counts as
+#      activity, resetting the inactivity timer.
 #
 # Setup:
 #   Settings → Secrets and variables → Actions → New repository secret
-#     Name:  HEALTHCHECK_URL
-#     Value: https://<your-deployment>/api/health
+#
+#   For the PRIMARY project:
+#     HEALTHCHECK_URL                    = https://<your-deployment>/api/health
+#
+#   For the BACKUP project (optional — skipped if not set):
+#     BACKUP_SUPABASE_URL                = https://<backup-project-ref>.supabase.co
+#     BACKUP_SUPABASE_SERVICE_ROLE_KEY   = <service role key from the backup project>
+#     BACKUP_KEEPALIVE_TABLE             = users   (optional; defaults to "users")
 #
 # See docs/services/supabase.md for the full explanation.
 
@@ -21,7 +34,8 @@ on:
   workflow_dispatch: {}
 
 jobs:
-  ping:
+  ping-primary:
+    name: Keep primary project awake (via /api/health)
     runs-on: ubuntu-latest
     steps:
       - name: Ping /api/health
@@ -45,3 +59,65 @@ jobs:
             echo "::error::Health endpoint reports DB is not OK."
             exit 1
           }
+
+  ping-backup:
+    name: Keep backup project awake (direct PostgREST query)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping backup Supabase REST endpoint
+        env:
+          BACKUP_SUPABASE_URL: ${{ secrets.BACKUP_SUPABASE_URL }}
+          BACKUP_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.BACKUP_SUPABASE_SERVICE_ROLE_KEY }}
+          BACKUP_KEEPALIVE_TABLE: ${{ secrets.BACKUP_KEEPALIVE_TABLE }}
+        run: |
+          # This step is OPTIONAL. If the backup secrets aren't configured,
+          # skip cleanly so the workflow still succeeds for primary-only setups.
+          if [ -z "$BACKUP_SUPABASE_URL" ] || [ -z "$BACKUP_SUPABASE_SERVICE_ROLE_KEY" ]; then
+            echo "Backup project secrets not set (BACKUP_SUPABASE_URL / BACKUP_SUPABASE_SERVICE_ROLE_KEY)."
+            echo "Skipping backup keepalive. Add the secrets to enable it. See docs/services/supabase.md."
+            exit 0
+          fi
+
+          # Strip any trailing slash from the URL so we don't build "//rest".
+          BASE="${BACKUP_SUPABASE_URL%/}"
+          TABLE="${BACKUP_KEEPALIVE_TABLE:-users}"
+
+          echo "Pinging backup project at $BASE (table: $TABLE)"
+
+          # Real data query — SELECT one row. Service-role key bypasses RLS so
+          # this returns rows regardless of policies, and touches Postgres,
+          # which is what resets the inactivity timer.
+          CODE=$(curl -sS -o /tmp/backup_resp.txt -w "%{http_code}" --max-time 30 \
+            -H "apikey: $BACKUP_SUPABASE_SERVICE_ROLE_KEY" \
+            -H "Authorization: Bearer $BACKUP_SUPABASE_SERVICE_ROLE_KEY" \
+            "$BASE/rest/v1/$TABLE?select=*&limit=1")
+
+          echo "HTTP $CODE from table query"
+          echo "Body: $(cat /tmp/backup_resp.txt)"
+
+          # 200/206 = query succeeded (project is awake).
+          if [ "$CODE" = "200" ] || [ "$CODE" = "206" ]; then
+            echo "Backup project is awake. Inactivity timer reset."
+            exit 0
+          fi
+
+          # 404 usually means the table name is wrong. Fall back to the
+          # PostgREST root, which introspects the schema (still a DB request)
+          # and keeps the project alive even if we don't know a table name.
+          if [ "$CODE" = "404" ]; then
+            echo "::warning::Table '$TABLE' not found (404). Falling back to PostgREST root introspection."
+            ROOT_CODE=$(curl -sS -o /tmp/backup_root.txt -w "%{http_code}" --max-time 30 \
+              -H "apikey: $BACKUP_SUPABASE_SERVICE_ROLE_KEY" \
+              -H "Authorization: Bearer $BACKUP_SUPABASE_SERVICE_ROLE_KEY" \
+              "$BASE/rest/v1/")
+            echo "HTTP $ROOT_CODE from root introspection"
+            if [ "$ROOT_CODE" = "200" ]; then
+              echo "Backup project is awake (via root introspection). Inactivity timer reset."
+              exit 0
+            fi
+            echo "::error::Backup keepalive failed. Root introspection returned HTTP $ROOT_CODE."
+            exit 1
+          fi
+
+          echo "::error::Backup keepalive failed. Table query returned HTTP $CODE (project may be paused, or the key/URL is wrong)."
+          exit 1
