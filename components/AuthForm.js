@@ -7,6 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Loader2, User, Lock, Eye, EyeOff } from 'lucide-react';
+import { ThemeToggle } from '@/components/theme-toggle';
 
 export default function AuthForm({ onAuthSuccess }) {
   const [isLoading, setIsLoading] = useState(false);
@@ -61,7 +62,10 @@ export default function AuthForm({ onAuthSuccess }) {
   };
 
   return (
-    <div className="flex items-center justify-center min-h-screen p-4">
+    <div className="relative flex items-center justify-center min-h-screen p-4">
+      <div className="absolute right-4 top-4">
+        <ThemeToggle />
+      </div>
       <Card className="w-full max-w-md mx-auto">
         <CardHeader className="text-center px-6">
           <CardTitle className="text-2xl font-bold">🍴 Forkcast</CardTitle>

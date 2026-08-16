@@ -400,6 +400,18 @@ frontend:
           agent: "testing"
           comment: "COMPREHENSIVE UI TESTING COMPLETED: Meal card button positioning working perfectly as requested. ✅ Found 11 meal cards with proper vertical button layout using flex-col class. ✅ 'View Recipe' buttons found and positioned correctly at the top. ✅ 'Add to Plan' buttons found and positioned correctly below 'View Recipe' buttons. ✅ Buttons are arranged vertically (not side by side) exactly as user requested. ✅ Both buttons span full width providing better mobile experience. ✅ Button functionality confirmed working - 'Add to Plan' successfully copies meals to user's collection. The vertical button layout provides a clean, user-friendly interface that works well on both desktop and mobile devices."
 
+  - task: "Light/Dark Theme Toggle"
+    implemented: true
+    working: true
+    file: "app/layout.js, app/globals.css, components/theme-provider.jsx, components/theme-toggle.jsx, components/themed-toaster.jsx, app/page.js, components/AuthForm.js, components/MealPlanningCalendar.js, components/kitchen/Pantry.js"
+    stuck_count: 0
+    priority: "medium"
+    needs_retesting: false
+    status_history:
+        - working: true
+          agent: "main"
+          comment: "Added light/dark theme toggle next to the Forkcast logo. Wired next-themes (already in package.json) via new ThemeProvider in app/layout.js with attribute='class', defaultTheme='light', enableSystem=false. New ThemeToggle button (Moon in light / Sun in dark, mounted-guarded to avoid hydration flash) placed next to the logo in app/page.js header AND top-right of AuthForm login screen. Toasts now theme-aware via new ThemedToaster (keeps richColors/closeButton/5s styling, follows resolvedTheme). Improved the .dark palette in globals.css so cards sit slightly elevated above the page background and destructive/error states remain visible. Fixed hardcoded pastel colors with dark: variants in MealPlanningCalendar meal-type/attribution/‘Yours’ badges and Pantry expiry amber text. QR-code container in SharePlanDialog intentionally left white for scannability. Verified via Playwright screenshots: login + main app shell render correctly in both light and dark; toggle flips document.documentElement class light<->dark and persists via localStorage. ESLint clean on all edits. (Meal data didn't load in preview because Supabase env vars are absent — expected, unrelated to theming.)"
+
 metadata:
   created_by: "testing_agent"
   version: "1.0"

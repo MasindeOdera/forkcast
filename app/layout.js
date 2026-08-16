@@ -1,8 +1,9 @@
 import { Inter } from 'next/font/google';
 import './globals.css';
-import { Toaster } from 'sonner';
 import { NetworkStatusBanner } from '@/components/ui/network-status-banner';
 import ServiceWorkerRegister from '@/components/ServiceWorkerRegister';
+import { ThemeProvider } from '@/components/theme-provider';
+import { ThemedToaster } from '@/components/themed-toaster';
 
 const inter = Inter({ subsets: ['latin'] });
 
@@ -64,35 +65,30 @@ export default function RootLayout({ children }) {
   return (
     <html lang="en" suppressHydrationWarning>
       <body className={inter.className}>
-        {/* Global offline banner — renders only when navigator.onLine === false */}
-        <NetworkStatusBanner />
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="light"
+          enableSystem={false}
+          disableTransitionOnChange
+        >
+          {/* Global offline banner — renders only when navigator.onLine === false */}
+          <NetworkStatusBanner />
 
-        {/* Registers /sw.js in production. See components/ServiceWorkerRegister.jsx */}
-        <ServiceWorkerRegister />
+          {/* Registers /sw.js in production. See components/ServiceWorkerRegister.jsx */}
+          <ServiceWorkerRegister />
 
-        {children}
+          {children}
 
-        {/*
-          Standardised toast styling:
-            - richColors: sonner picks green/red/etc. based on toast.success / toast.error
-            - closeButton: user can dismiss long errors early
-            - duration bumped to 5s so error copy is readable
-            - toastOptions.classNames: consistent radius + padding across variants
-        */}
-        <Toaster
-          position="top-right"
-          richColors
-          expand={false}
-          closeButton
-          duration={5000}
-          toastOptions={{
-            classNames: {
-              toast: 'rounded-lg shadow-lg border',
-              title: 'font-medium',
-              description: 'text-sm text-muted-foreground',
-            },
-          }}
-        />
+          {/*
+            Standardised, theme-aware toasts:
+              - follows light/dark via next-themes (components/themed-toaster.jsx)
+              - richColors: sonner picks green/red/etc. based on toast.success / toast.error
+              - closeButton: user can dismiss long errors early
+              - duration 5s so error copy is readable
+              - consistent radius + shadow across variants
+          */}
+          <ThemedToaster />
+        </ThemeProvider>
       </body>
     </html>
   );

@@ -36,6 +36,7 @@ import Kitchen from '@/components/kitchen/Kitchen';
 import { EmptyState } from '@/components/ui/empty-state';
 import { MealCardGrid } from '@/components/ui/meal-card-skeleton';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
+import { ThemeToggle } from '@/components/theme-toggle';
 import { apiGet, apiPost, apiPut, apiDelete } from '@/lib/api-client';
 
 export default function App() {
@@ -381,10 +382,11 @@ export default function App() {
       {/* Header */}
       <header className="sticky top-0 z-50 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="container flex h-16 items-center justify-between">
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2">
             <h1 className="text-2xl font-bold flex items-center gap-2">
               🍴 <span>Forkcast</span>
             </h1>
+            <ThemeToggle className="ml-1" />
           </div>
 
           <div className="flex items-center gap-4">

@@ -347,10 +347,10 @@ export default function MealPlanningCalendar() {
 
   const getMealTypeColor = (mealType) => {
     switch (mealType) {
-      case 'breakfast': return 'bg-orange-100 text-orange-800 border-orange-200';
-      case 'lunch': return 'bg-blue-100 text-blue-800 border-blue-200';
-      case 'dinner': return 'bg-purple-100 text-purple-800 border-purple-200';
-      default: return 'bg-gray-100 text-gray-800 border-gray-200';
+      case 'breakfast': return 'bg-orange-100 text-orange-800 border-orange-200 dark:bg-orange-950 dark:text-orange-300 dark:border-orange-900';
+      case 'lunch': return 'bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-950 dark:text-blue-300 dark:border-blue-900';
+      case 'dinner': return 'bg-purple-100 text-purple-800 border-purple-200 dark:bg-purple-950 dark:text-purple-300 dark:border-purple-900';
+      default: return 'bg-gray-100 text-gray-800 border-gray-200 dark:bg-muted dark:text-muted-foreground dark:border-border';
     }
   };
 
@@ -555,7 +555,7 @@ export default function MealPlanningCalendar() {
                           {plannedMeal.title}
                         </h4>
                         {plannedMeal.isOwn === false && (
-                          <Badge variant="outline" className="mt-1 text-[10px] bg-blue-50 text-blue-700 border-blue-200">
+                          <Badge variant="outline" className="mt-1 text-[10px] bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950 dark:text-blue-300 dark:border-blue-900">
                             by {plannedMeal.user?.username}
                           </Badge>
                         )}
@@ -646,7 +646,7 @@ export default function MealPlanningCalendar() {
                               {MEAL_TYPES.find(t => t.value === mealType)?.label}
                             </Badge>
                             {plannedMeal.isOwn === false && (
-                              <Badge variant="outline" className="text-xs bg-blue-50 text-blue-700 border-blue-200">
+                              <Badge variant="outline" className="text-xs bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950 dark:text-blue-300 dark:border-blue-900">
                                 by {plannedMeal.user?.username}
                               </Badge>
                             )}
@@ -754,7 +754,7 @@ export default function MealPlanningCalendar() {
                                   {meal.ingredients.split('\n')[0]}
                                 </p>
                               </div>
-                              <Badge className="text-xs bg-green-100 text-green-800">
+                              <Badge className="text-xs bg-green-100 text-green-800 dark:bg-green-950 dark:text-green-300">
                                 Yours
                               </Badge>
                             </div>

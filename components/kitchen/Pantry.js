@@ -333,7 +333,7 @@ function ExpiryBucket({ tone, icon: Icon, title, description, items, onRemove })
   const toneClasses = tone === 'destructive'
     ? 'border-destructive/40 bg-destructive/5'
     : 'border-amber-500/40 bg-amber-500/5';
-  const iconClasses = tone === 'destructive' ? 'text-destructive' : 'text-amber-600';
+  const iconClasses = tone === 'destructive' ? 'text-destructive' : 'text-amber-600 dark:text-amber-400';
   return (
     <Card className={`border ${toneClasses}`}>
       <CardHeader className="pb-2">
@@ -348,7 +348,7 @@ function ExpiryBucket({ tone, icon: Icon, title, description, items, onRemove })
           {items.map((item) => (
             <li key={item.id} className="flex items-center justify-between gap-3">
               <div className="min-w-0 flex items-center gap-2">
-                <Badge variant="outline" className={tone === 'destructive' ? 'border-destructive text-destructive' : 'border-amber-500 text-amber-700'}>
+                <Badge variant="outline" className={tone === 'destructive' ? 'border-destructive text-destructive' : 'border-amber-500 text-amber-700 dark:text-amber-400'}>
                   {item.expiresAt}
                 </Badge>
                 <span className="truncate">{item.name}</span>
